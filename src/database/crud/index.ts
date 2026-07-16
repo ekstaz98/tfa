@@ -1,0 +1,13 @@
+export { CrudService, SoftDeleteCrudService } from './crud.service';
+export { TypesCrudService } from './types-crud.service';
+export { TagsCrudService } from './tags-crud.service';
+export { MethodsCrudService } from './methods-crud.service';
+export { MethodTypesCrudService } from './method-types-crud.service';
+export { MethodTagsCrudService } from './method-tags-crud.service';
+export { UsersCrudService } from './users-crud.service';
+export { UserCredentialsCrudService } from './user-credentials-crud.service';
+export { UserMethodsCrudService } from './user-methods-crud.service';
+export { UserMethodTypesCrudService } from './user-method-types-crud.service';
+export { UserMethodTagsCrudService } from './user-method-tags-crud.service';
+export { OperationsCrudService } from './operations-crud.service';
+export { CodesCrudService } from './codes-crud.service';
