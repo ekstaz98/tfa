@@ -21,7 +21,7 @@ import {
 } from '../database/entities';
 import { TwoFaError, TwoFaErrorCode } from '../errors';
 import { TAG_SYSTEM, TAG_UNAUTHED } from '../methods/constants';
-import { EffectiveMethodsResolverService } from '../methods/effective-methods-resolver.service';
+import { EffectiveMethodsResolverService } from '../methods/services';
 import { CodeGeneratorService } from './code-generator.service';
 import {
   IdentityMaskerService,

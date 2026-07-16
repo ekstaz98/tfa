@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GatewayMethodsPort } from '../gateway-methods.port';
+import { GatewayMethodsPort } from '../interfaces';
 
 const INTROSPECTION_QUERY = `{
   __schema {

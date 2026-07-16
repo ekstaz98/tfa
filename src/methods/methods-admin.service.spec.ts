@@ -1,7 +1,6 @@
 import { Method, MethodTag, MethodType, Tag, Type } from '../database/entities';
 import { TwoFaError } from '../errors';
-import { MethodViewsService } from './method-views.service';
-import { MethodsAdminService } from './methods-admin.service';
+import { MethodViewsService, MethodsAdminService } from './services';
 import { FakeCrud, fakeDataSource, seedDictionaries } from '../testing/fakes';
 
 describe('MethodsAdminService', () => {

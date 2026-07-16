@@ -1,13 +1,15 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
-import { EffectiveMethodsResolverService } from './effective-methods-resolver.service';
-import { GatewayIntrospectionService } from './gateway-introspection.service';
-import { GATEWAY_METHODS_PORT } from './gateway-methods.port';
-import { MethodViewsService } from './method-views.service';
-import { MethodsAdminService } from './methods-admin.service';
-import { MethodsSyncService } from './methods-sync.service';
-import { SettingsHashService } from './settings-hash.service';
-import { UserSettingsService } from './user-settings.service';
+import {
+  EffectiveMethodsResolverService,
+  MethodViewsService,
+  GatewayIntrospectionService,
+  MethodsAdminService,
+  MethodsSyncService,
+  SettingsHashService,
+  UserSettingsService,
+} from './services';
+import { GATEWAY_METHODS_PORT } from './interfaces';
 
 @Module({
   imports: [DatabaseModule],

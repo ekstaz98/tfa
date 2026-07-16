@@ -9,7 +9,7 @@ import {
   UserMethodType,
 } from '../database/entities';
 import { TwoFaError } from '../errors';
-import { EffectiveMethodsResolverService } from './effective-methods-resolver.service';
+import { EffectiveMethodsResolverService } from './services';
 import { FakeCrud, seedDictionaries } from '../testing/fakes';
 
 const CORE_USER_ID = 'core-user-1';

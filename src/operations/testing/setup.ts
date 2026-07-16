@@ -14,7 +14,7 @@ import {
   UserMethodType,
 } from '../../database/entities';
 import { CredentialCipherService } from '../../crypto/credential-cipher.service';
-import { EffectiveMethodsResolverService } from '../../methods/effective-methods-resolver.service';
+import { EffectiveMethodsResolverService } from '../../methods/services';
 import {
   FakeCodesCrud,
   FakeCrud,
