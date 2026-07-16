@@ -32,6 +32,7 @@
     "@nestjs/graphql": "^12.2.2",
     "@nestjs/microservices": "^10.4.22",
     "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/schedule": "^4.1.2",
     "@nestjs/typeorm": "^10.0.2",
     "amqp-connection-manager": "^5.0.0",
     "amqplib": "^2.0.1",

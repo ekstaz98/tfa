@@ -6,7 +6,9 @@ import { validateEnv } from './config/env.validation';
 import { CryptoModule } from './crypto/crypto.module';
 import { DatabaseModule } from './database/database.module';
 import { buildDataSourceOptions } from './database/typeorm-options';
+import { ScheduleModule } from '@nestjs/schedule';
 import { MethodsModule } from './methods/methods.module';
+import { OperationsModule } from './operations/operations.module';
 
 @Module({
   imports: [
@@ -20,9 +22,11 @@ import { MethodsModule } from './methods/methods.module';
       useFactory: (config: ConfigService) =>
         buildDataSourceOptions(config.getOrThrow<string>('database.url')),
     }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     CryptoModule,
     MethodsModule,
+    OperationsModule,
   ],
 })
 export class AppModule {}

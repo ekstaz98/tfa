@@ -10,7 +10,7 @@ import {
 } from '../database/entities';
 import { TwoFaError } from '../errors';
 import { EffectiveMethodsResolverService } from './effective-methods-resolver.service';
-import { FakeCrud, seedDictionaries } from './testing/fakes';
+import { FakeCrud, seedDictionaries } from '../testing/fakes';
 
 const CORE_USER_ID = 'core-user-1';
 

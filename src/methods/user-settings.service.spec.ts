@@ -11,7 +11,7 @@ import {
 } from '../database/entities';
 import { TwoFaError } from '../errors';
 import { UserSettingsService } from './user-settings.service';
-import { FakeCrud, fakeDataSource, seedDictionaries } from './testing/fakes';
+import { FakeCrud, fakeDataSource, seedDictionaries } from '../testing/fakes';
 
 const CORE_USER_ID = 'core-user-1';
 

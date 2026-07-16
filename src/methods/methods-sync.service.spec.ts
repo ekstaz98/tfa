@@ -1,6 +1,6 @@
 import { Method } from '../database/entities';
 import { MethodsSyncService } from './methods-sync.service';
-import { FakeCrud, fakeDataSource } from './testing/fakes';
+import { FakeCrud, fakeDataSource } from '../testing/fakes';
 
 describe('MethodsSyncService.updateListMethods', () => {
   let methodsCrud: FakeCrud<Method>;
