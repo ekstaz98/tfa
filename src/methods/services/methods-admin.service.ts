@@ -6,15 +6,15 @@ import {
   MethodsCrudService,
   TagsCrudService,
   TypesCrudService,
-} from '../database/crud';
-import { Method } from '../database/entities';
-import { TwoFaError, TwoFaErrorCode } from '../errors';
-import { MODE_TAGS, TAG_SYSTEM } from './constants';
+} from '../../database/crud';
+import { Method } from '../../database/entities';
+import { TwoFaError, TwoFaErrorCode } from '../../errors';
+import { MODE_TAGS, TAG_SYSTEM } from '../constants';
 import {
   CreateMethodInput,
   MethodView,
   UpdateMethodInput,
-} from './method-view';
+} from '../interfaces';
 import { MethodViewsService } from './method-views.service';
 
 interface Dictionaries {

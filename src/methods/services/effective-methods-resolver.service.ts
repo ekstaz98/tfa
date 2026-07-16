@@ -9,10 +9,10 @@ import {
   UserMethodTypesCrudService,
   UserMethodsCrudService,
   UsersCrudService,
-} from '../database/crud';
-import { TwoFaError, TwoFaErrorCode } from '../errors';
-import { TAG_UNAUTHED, TAG_USER } from './constants';
-import { MethodView } from './method-view';
+} from '../../database/crud';
+import { TwoFaError, TwoFaErrorCode } from '../../errors';
+import { TAG_UNAUTHED, TAG_USER } from './../constants';
+import { MethodView } from '../interfaces';
 
 /**
  * Резолв эффективных требований 2ФА для (userId | null, tags[]).

@@ -5,9 +5,9 @@ import {
   MethodTypesCrudService,
   TagsCrudService,
   TypesCrudService,
-} from '../database/crud';
-import { Method } from '../database/entities';
-import { MethodView } from './method-view';
+} from '../../database/crud';
+import { Method } from '../../database/entities';
+import { MethodView } from '../interfaces';
 
 /** Сборка представлений методов (формат 2faMethods) из связей и справочников. */
 @Injectable()

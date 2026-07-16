@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { MethodView } from './method-view';
+import { MethodView } from '../interfaces';
 
 /**
  * Детерминированный хэш эффективного списка для контракта 2faMethods(hash).

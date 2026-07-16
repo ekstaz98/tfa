@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { MethodsCrudService } from '../database/crud';
+import { MethodsCrudService } from '../../database/crud';
 import {
   GATEWAY_METHODS_PORT,
   GatewayMethodsPort,
-} from './gateway-methods.port';
+} from '../gateway-methods.port';
 
 export interface MethodsSyncResult {
   created: string[];

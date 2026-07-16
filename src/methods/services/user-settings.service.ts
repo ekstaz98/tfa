@@ -10,11 +10,11 @@ import {
   UserMethodTypesCrudService,
   UserMethodsCrudService,
   UsersCrudService,
-} from '../database/crud';
-import { Method, User, UserMethod } from '../database/entities';
-import { TwoFaError, TwoFaErrorCode } from '../errors';
-import { TAG_USER, TOTP_TYPE } from './constants';
-import { MethodView, UpdateMyMethodInput } from './method-view';
+} from '../../database/crud';
+import { Method, User, UserMethod } from '../../database/entities';
+import { TwoFaError, TwoFaErrorCode } from '../../errors';
+import { TAG_USER, TOTP_TYPE } from '../constants';
+import { MethodView, UpdateMyMethodInput } from '../interfaces';
 
 /**
  * updateMy2faMethod: переопределение методов юзером. Разрешено только
