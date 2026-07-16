@@ -10,6 +10,7 @@ type RepositoryMock = {
   findOneBy: jest.Mock;
   findBy: jest.Mock;
   update: jest.Mock;
+  delete: jest.Mock;
 };
 
 function buildRepositoryMock(target: unknown): RepositoryMock {
@@ -22,6 +23,7 @@ function buildRepositoryMock(target: unknown): RepositoryMock {
     findOneBy: jest.fn().mockResolvedValue(null),
     findBy: jest.fn().mockResolvedValue([]),
     update: jest.fn().mockResolvedValue({ affected: 1 }),
+    delete: jest.fn().mockResolvedValue({ affected: 1 }),
   };
 }
 
@@ -62,6 +64,11 @@ describe('CrudService (на примере MethodsCrudService / TagsCrudService)
     expect(repository.update).toHaveBeenCalledWith('id-42', {
       isActive: false,
     });
+  });
+
+  it('delete удаляет по id', async () => {
+    await service.delete('id-42');
+    expect(repository.delete).toHaveBeenCalledWith('id-42');
   });
 
   it('softDelete ставит isDeleted = true', async () => {

@@ -50,6 +50,11 @@ export abstract class CrudService<T extends HasId> {
   ): Promise<void> {
     await this.repo(manager).update(id, data);
   }
+
+  /** Жёсткое удаление — для junction-таблиц без is_deleted (дифф связей). */
+  async delete(id: string, manager?: EntityManager): Promise<void> {
+    await this.repo(manager).delete(id);
+  }
 }
 
 interface HasSoftDelete extends HasId {

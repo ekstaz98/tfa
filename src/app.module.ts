@@ -6,6 +6,7 @@ import { validateEnv } from './config/env.validation';
 import { CryptoModule } from './crypto/crypto.module';
 import { DatabaseModule } from './database/database.module';
 import { buildDataSourceOptions } from './database/typeorm-options';
+import { MethodsModule } from './methods/methods.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { buildDataSourceOptions } from './database/typeorm-options';
     }),
     DatabaseModule,
     CryptoModule,
+    MethodsModule,
   ],
 })
 export class AppModule {}
