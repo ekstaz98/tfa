@@ -3,6 +3,7 @@ export * from './hash-code.verifier';
 export * from './identity.service';
 export * from './mock-code-send-publisher';
 export * from './operation.service';
+export * from './requirement.service';
 export * from './retention.service';
 export * from './totp.verifier';
 export * from './verification.service';

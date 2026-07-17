@@ -12,6 +12,7 @@ import {
   OperationService,
   RetentionService,
   TotpVerifier,
+  TwoFaRequirementService,
   VerificationService,
   VerifierRegistry,
 } from './services';
@@ -31,11 +32,13 @@ import {
     IdentityMaskerService,
     OperationService,
     VerificationService,
+    TwoFaRequirementService,
     RetentionService,
   ],
   exports: [
     OperationService,
     VerificationService,
+    TwoFaRequirementService,
     IdentityNormalizerService,
     MockCodeSendPublisher,
   ],

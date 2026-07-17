@@ -1,3 +1,4 @@
+import { HttpException } from '@nestjs/common';
 import { unwrapResolverError } from '@apollo/server/errors';
 import { GraphQLFormattedError } from 'graphql';
 import { TwoFaError, TwoFaErrorShape } from './two-fa.error';
@@ -37,6 +38,17 @@ export function formatGraphQlError(
   const original = unwrapResolverError(error);
   if (original instanceof TwoFaError) {
     return original.toShape() as unknown as GraphQLFormattedError;
+  }
+
+  // guard-заглушки (Forbidden/Unauthorized и т.п.) — не маскируем статус
+  if (original instanceof HttpException) {
+    const status = original.getStatus();
+    return {
+      message: original.message,
+      title: 'Request rejected',
+      code: `HTTP-${status}`,
+      status,
+    } as unknown as GraphQLFormattedError;
   }
 
   const apolloCode = formattedError.extensions?.code;

@@ -29,9 +29,33 @@ npm run migration:revert
 
 Схема управляется только миграциями (`synchronize: false`), naming — snake_case.
 
+## GraphQL API
+
+Схема генерируется в `schema.gql` при старте. Имена `2faTypes`/`2faMethods`
+из ТЗ невозможны в GraphQL (имя не может начинаться с цифры) →
+`twoFaTypes`/`twoFaMethods`; остальные имена — по ТЗ.
+
+### Требования к гейтвею
+
+- заголовки: `x-user-id` (core userId), `x-roles` (`admin`/`service`,
+  через запятую), `x-client-ip` (IP клиента — опора часового лимита
+  unauthed-операций), `x-2fa-operationid` (переотправка кодов);
+- перед проксированием защищённого запроса гейтвей вызывает мутацию
+  `verify2fa` (роль `service`): с `operationId` — верификация кодов
+  (хедеры `x-2fa-operationId`/`x-2fa-codes` клиента разбирает гейтвей),
+  без `operationId` — ответ `{ required }` для `(method, userId | identity)`;
+- для unauthed-методов (signin) гейтвей обязан извлечь identity из тела
+  запроса и передать его в `verify2fa` — юзер может полностью отключить
+  2ФА на signin, ответ идёт по его настройкам.
+
+Авторизация — зона гейтвея: сервис доверяет заголовкам, guards — заглушки.
+
 ## Тесты
 
 ```bash
 npm run test
-npm run test:e2e
+npm run test:e2e   # нужен запущенный docker compose (postgres)
 ```
+
+e2e ходят в отдельную базу `tfa_e2e` (пересоздаётся при каждом прогоне)
+и читают коды из мок-реализации порта отправки — API чтения кодов нет.

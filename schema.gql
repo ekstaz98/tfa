@@ -1,0 +1,122 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+input CreateMethodInputDto {
+  isActive: Boolean
+  method: String!
+  tags: [String!]!
+  types: [String!]!
+}
+
+input CreateMethodsInput {
+  methods: [CreateMethodInputDto!]!
+}
+
+type Mutation {
+  create2faMethod(input: CreateMethodsInput!): [TwoFaMethod!]!
+  send2Fa(input: Send2FaInput!): Send2FaResponse!
+  update2faMethod(input: UpdateMethodsInput!): [TwoFaMethod!]!
+  updateListMethods: UpdateListMethodsResponse!
+  updateMy2faMethod(input: UpdateMyMethodsInput!): [TwoFaMethod!]!
+  verify2fa(input: Verify2faInput!): Verify2faResponse!
+}
+
+type Query {
+  twoFaMethods(input: TwoFaMethodsInput): TwoFaMethodsResponse!
+  twoFaTypes: [TwoFaType!]!
+}
+
+input Send2FaInput {
+  identity: String
+  locale: String
+  method: String!
+  types: [String!]
+}
+
+type Send2FaResponse {
+  operationId: ID!
+  types: [Send2FaTypeDto!]!
+}
+
+type Send2FaTypeDto {
+  expire: Int
+  identity: String
+  retry: Int
+  type: String!
+}
+
+type TwoFaMethod {
+  id: ID!
+  isActive: Boolean!
+  isDeleted: Boolean!
+  method: String!
+  tags: [String!]!
+  types: [String!]!
+}
+
+input TwoFaMethodsInput {
+  hash: String
+  tags: [String!]
+}
+
+type TwoFaMethodsResponse {
+  hash: String!
+  methods: [TwoFaMethod!]
+  upToDate: Boolean!
+}
+
+type TwoFaType {
+  id: ID!
+  isActive: Boolean!
+  isDeleted: Boolean!
+  type: String!
+}
+
+type UpdateListMethodsResponse {
+  created: [String!]!
+  deactivated: [String!]!
+}
+
+input UpdateMethodInputDto {
+  id: ID!
+  isActive: Boolean
+  isDeleted: Boolean
+  method: String
+  tags: [String!]
+  types: [String!]
+}
+
+input UpdateMethodsInput {
+  methods: [UpdateMethodInputDto!]!
+}
+
+input UpdateMyMethodInputDto {
+  id: ID!
+  isActive: Boolean
+  types: [String!]
+}
+
+input UpdateMyMethodsInput {
+  methods: [UpdateMyMethodInputDto!]!
+}
+
+input Verify2faInput {
+  codes: [VerifyCodeInput!]
+  identity: String
+  method: String!
+  operationId: ID
+  userId: String
+}
+
+type Verify2faResponse {
+  identity: String
+  required: Boolean
+  userId: String
+  verified: Boolean
+}
+
+input VerifyCodeInput {
+  code: String!
+  type: String!
+}

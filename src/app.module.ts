@@ -7,6 +7,7 @@ import { CryptoModule } from './crypto/crypto.module';
 import { DatabaseModule } from './database/database.module';
 import { buildDataSourceOptions } from './database/typeorm-options';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ApiModule } from './api/api.module';
 import { MethodsModule } from './methods/methods.module';
 import { OperationsModule } from './operations/operations.module';
 
@@ -27,6 +28,7 @@ import { OperationsModule } from './operations/operations.module';
     CryptoModule,
     MethodsModule,
     OperationsModule,
+    ApiModule,
   ],
 })
 export class AppModule {}
