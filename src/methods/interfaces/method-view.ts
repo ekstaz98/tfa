@@ -1,4 +1,4 @@
-/** Элемент ответа 2faMethods (и админ/юзер-мутаций) — формат из ТЗ. */
+/** Элемент ответа twoFaMethods (и админ/юзер-мутаций) — формат из ТЗ. */
 export interface MethodView {
   id: string;
   method: string;

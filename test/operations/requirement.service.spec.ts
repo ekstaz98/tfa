@@ -3,7 +3,7 @@ import { OperationsTestBed, buildTestBed } from './setup';
 
 const CORE_USER = 'core-user-1';
 
-describe('TwoFaRequirementService.isRequired (verify2fa без operationId)', () => {
+describe('TwoFaRequirementService.isRequired (verifyTwoFa без operationId)', () => {
   let bed: OperationsTestBed;
   let service: TwoFaRequirementService;
 

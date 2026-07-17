@@ -27,7 +27,7 @@ export const INTERNAL_ERROR_SHAPE: TwoFaErrorShape = {
 /**
  * formatError для Apollo — единственная точка формата ошибок API
  * ({"errors":[{message,title,code,status}]}). Ставится в GraphQLModule
- * и потому покрывает весь API, включая verify2fa: отдельного транспорта
+ * и потому покрывает весь API, включая verifyTwoFa: отдельного транспорта
  * ошибок нет. Недоменные ошибки маскируются (внутренности не утекают),
  * ошибки парсинга/валидации GraphQL отдаются клиенту как BAD_REQUEST-400.
  */

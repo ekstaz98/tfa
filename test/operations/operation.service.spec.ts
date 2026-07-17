@@ -6,7 +6,7 @@ import { OperationsTestBed, buildTestBed } from './setup';
 
 const CORE_USER = 'core-user-1';
 
-describe('OperationService.send2Fa', () => {
+describe('OperationService.sendTwoFa', () => {
   let bed: OperationsTestBed;
   let service: OperationService;
 
@@ -58,7 +58,7 @@ describe('OperationService.send2Fa', () => {
   it('happy path (sms+email, authed): операция, коды, события, маски', async () => {
     const user = setupAuthedTransfer();
 
-    const result = await service.send2Fa({
+    const result = await service.sendTwoFa({
       method: 'transfer',
       actor: { userId: CORE_USER },
     });
@@ -99,17 +99,20 @@ describe('OperationService.send2Fa', () => {
   it('публикация происходит после коммита транзакции', async () => {
     setupAuthedTransfer();
 
-    await service.send2Fa({ method: 'transfer', actor: { userId: CORE_USER } });
+    await service.sendTwoFa({
+      method: 'transfer',
+      actor: { userId: CORE_USER },
+    });
 
     expect(bed.publisher.publishedInTransaction).toEqual([false, false]);
   });
 
-  it('ошибка публикации не роняет send2Fa (fire-and-forget)', async () => {
+  it('ошибка публикации не роняет sendTwoFa (fire-and-forget)', async () => {
     setupAuthedTransfer();
     bed.publisher.failWith = new Error('events service down');
     const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
 
-    const result = await service.send2Fa({
+    const result = await service.sendTwoFa({
       method: 'transfer',
       actor: { userId: CORE_USER },
     });
@@ -127,7 +130,7 @@ describe('OperationService.send2Fa', () => {
     const user = bed.addUser(CORE_USER);
     bed.addCredential(user, 'ga', 'ga-identity', { secret: '1:x:y:z' });
 
-    const result = await service.send2Fa({
+    const result = await service.sendTwoFa({
       method: 'withdraw',
       actor: { userId: CORE_USER },
     });
@@ -142,14 +145,14 @@ describe('OperationService.send2Fa', () => {
 
   it('неизвестный метод → UNKNOWN_METHOD-002', () =>
     expectCode(
-      service.send2Fa({ method: 'ghost', actor: { userId: CORE_USER } }),
+      service.sendTwoFa({ method: 'ghost', actor: { userId: CORE_USER } }),
       'UNKNOWN_METHOD-002',
     ));
 
   it('unauthed на метод без тега unauthed → WRONG_METHOD-003', async () => {
     bed.addMethod('transfer', ['sms'], ['user']);
     await expectCode(
-      service.send2Fa({
+      service.sendTwoFa({
         method: 'transfer',
         actor: { identity: '+79123453345' },
       }),
@@ -160,7 +163,7 @@ describe('OperationService.send2Fa', () => {
   it('регистрационный метод (system+unauthed): код реально уходит на незнакомый identity', async () => {
     bed.addMethod('signup', ['sms'], ['system', 'unauthed']);
 
-    const result = await service.send2Fa({
+    const result = await service.sendTwoFa({
       method: 'signup',
       actor: { identity: '8 (912) 345-33-45', clientIp: '1.2.3.4' },
       locale: 'ru',
@@ -182,7 +185,7 @@ describe('OperationService.send2Fa', () => {
   it('signin: неизвестный identity → операция-пустышка, неотличимая снаружи', async () => {
     bed.addMethod('signin', ['email'], ['unauthed', 'user']);
 
-    const result = await service.send2Fa({
+    const result = await service.sendTwoFa({
       method: 'signin',
       actor: { identity: 'random@mail.com' },
     });
@@ -204,7 +207,10 @@ describe('OperationService.send2Fa', () => {
     const user = bed.addUser(CORE_USER);
     bed.addCredential(user, 'email', 'a@b.com', { isConfirmed: false });
 
-    await service.send2Fa({ method: 'signin', actor: { identity: 'a@b.com' } });
+    await service.sendTwoFa({
+      method: 'signin',
+      actor: { identity: 'a@b.com' },
+    });
 
     expect(bed.publisher.events).toHaveLength(0);
     expect(bed.crud.operations.rows).toHaveLength(1);
@@ -222,7 +228,7 @@ describe('OperationService.send2Fa', () => {
     });
     void override;
 
-    const result = await service.send2Fa({
+    const result = await service.sendTwoFa({
       method: 'signin',
       actor: { identity: 'a@b.com' },
     });
@@ -243,7 +249,7 @@ describe('OperationService.send2Fa', () => {
     });
 
     await expectCode(
-      service.send2Fa({ method: 'transfer', actor: { userId: CORE_USER } }),
+      service.sendTwoFa({ method: 'transfer', actor: { userId: CORE_USER } }),
       'METHOD_NOT_COVERED-016',
     );
   });
@@ -254,7 +260,7 @@ describe('OperationService.send2Fa', () => {
     bed.addCredential(user, 'email', 'a@b.com', { isConfirmed: false });
 
     await expectCode(
-      service.send2Fa({ method: 'transfer', actor: { userId: CORE_USER } }),
+      service.sendTwoFa({ method: 'transfer', actor: { userId: CORE_USER } }),
       'UNKNOWN_IDENTITY-015',
     );
     expect(bed.crud.operations.rows).toHaveLength(0);
@@ -275,7 +281,7 @@ describe('OperationService.send2Fa', () => {
       }
 
       await expectCode(
-        service.send2Fa({ method: 'transfer', actor: { userId: CORE_USER } }),
+        service.sendTwoFa({ method: 'transfer', actor: { userId: CORE_USER } }),
         'OPERATIONS_LIMIT-013',
       );
       const lockCalls = bed.ds.managerMock.query.mock.calls.filter(
@@ -288,11 +294,11 @@ describe('OperationService.send2Fa', () => {
       const signin = bed.addMethod('signin', ['email'], ['unauthed', 'user']);
       void signin;
       // две пустышки на этот identity уже созданы
-      await service.send2Fa({
+      await service.sendTwoFa({
         method: 'signin',
         actor: { identity: 'ghost@mail.com' },
       });
-      await service.send2Fa({
+      await service.sendTwoFa({
         method: 'signin',
         actor: { identity: 'ghost@mail.com' },
       });
@@ -302,7 +308,7 @@ describe('OperationService.send2Fa', () => {
       }
 
       await expectCode(
-        service.send2Fa({
+        service.sendTwoFa({
           method: 'signin',
           actor: { identity: 'ghost@mail.com' },
         }),
@@ -312,11 +318,11 @@ describe('OperationService.send2Fa', () => {
 
     it('часовой IP-лимит ловит ротацию identity → IP_LIMIT-014', async () => {
       bed.addMethod('signup', ['sms'], ['system', 'unauthed']);
-      await service.send2Fa({
+      await service.sendTwoFa({
         method: 'signup',
         actor: { identity: '+79000000001', clientIp: '9.9.9.9' },
       });
-      await service.send2Fa({
+      await service.sendTwoFa({
         method: 'signup',
         actor: { identity: '+79000000002', clientIp: '9.9.9.9' },
       });
@@ -325,7 +331,7 @@ describe('OperationService.send2Fa', () => {
       }
 
       await expectCode(
-        service.send2Fa({
+        service.sendTwoFa({
           method: 'signup',
           actor: { identity: '+79000000003', clientIp: '9.9.9.9' },
         }),
@@ -337,7 +343,7 @@ describe('OperationService.send2Fa', () => {
   describe('переотправка (x-2fa-operationId)', () => {
     async function createTransferOperation() {
       setupAuthedTransfer();
-      const result = await service.send2Fa({
+      const result = await service.sendTwoFa({
         method: 'transfer',
         actor: { userId: CORE_USER },
       });
@@ -357,7 +363,7 @@ describe('OperationService.send2Fa', () => {
       const operationId = await createTransferOperation();
 
       await expectCode(
-        service.send2Fa({
+        service.sendTwoFa({
           method: 'transfer',
           actor: { userId: CORE_USER },
           operationId,
@@ -376,7 +382,7 @@ describe('OperationService.send2Fa', () => {
       const oldHash = smsRow!.codeHash;
       const rowsBefore = bed.crud.codes.rows.length;
 
-      const result = await service.send2Fa({
+      const result = await service.sendTwoFa({
         method: 'transfer',
         actor: { userId: CORE_USER },
         operationId,
@@ -398,7 +404,7 @@ describe('OperationService.send2Fa', () => {
       );
       const emailHash = emailRow!.codeHash;
 
-      await service.send2Fa({
+      await service.sendTwoFa({
         method: 'transfer',
         actor: { userId: CORE_USER },
         operationId,
@@ -419,7 +425,7 @@ describe('OperationService.send2Fa', () => {
       }
 
       await expectCode(
-        service.send2Fa({
+        service.sendTwoFa({
           method: 'transfer',
           actor: { userId: CORE_USER },
           operationId,
@@ -433,13 +439,13 @@ describe('OperationService.send2Fa', () => {
       const user = bed.addUser(CORE_USER);
       bed.addCredential(user, 'sms', '+79123453345');
       bed.addCredential(user, 'ga', 'ga-id', { secret: '1:x:y:z' });
-      const { operationId } = await service.send2Fa({
+      const { operationId } = await service.sendTwoFa({
         method: 'withdraw',
         actor: { userId: CORE_USER },
       });
 
       await expectCode(
-        service.send2Fa({
+        service.sendTwoFa({
           method: 'withdraw',
           actor: { userId: CORE_USER },
           operationId,
@@ -456,7 +462,7 @@ describe('OperationService.send2Fa', () => {
       bed.addCredential(stranger, 'email', 'x@y.com');
 
       await expectCode(
-        service.send2Fa({
+        service.sendTwoFa({
           method: 'transfer',
           actor: { userId: 'core-user-2' },
           operationId,
@@ -471,7 +477,7 @@ describe('OperationService.send2Fa', () => {
       operation.expiresAt = new Date(Date.now() - 1000);
 
       await expectCode(
-        service.send2Fa({
+        service.sendTwoFa({
           method: 'transfer',
           actor: { userId: CORE_USER },
           operationId,
@@ -483,7 +489,7 @@ describe('OperationService.send2Fa', () => {
 
     it('переотправка пустышки отрабатывает штатно и без публикации', async () => {
       bed.addMethod('signin', ['email'], ['unauthed', 'user']);
-      const { operationId } = await service.send2Fa({
+      const { operationId } = await service.sendTwoFa({
         method: 'signin',
         actor: { identity: 'ghost@mail.com' },
       });
@@ -491,7 +497,7 @@ describe('OperationService.send2Fa', () => {
       const row = bed.crud.codes.rows[0];
       const oldHash = row.codeHash;
 
-      const result = await service.send2Fa({
+      const result = await service.sendTwoFa({
         method: 'signin',
         actor: { identity: 'ghost@mail.com' },
         operationId,

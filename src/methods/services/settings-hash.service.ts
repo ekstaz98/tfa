@@ -3,7 +3,7 @@ import { createHash } from 'crypto';
 import { MethodView } from '../interfaces';
 
 /**
- * Детерминированный хэш эффективного списка для контракта 2faMethods(hash).
+ * Детерминированный хэш эффективного списка для контракта twoFaMethods(hash).
  * Перечень полей фиксирован явно: id, method, isActive, types, tags.
  * Волатильные поля (updatedAt и т.п.) не участвуют; методы и связи
  * сортируются — порядок выборки на хэш не влияет. Секрет не нужен:

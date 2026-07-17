@@ -110,17 +110,20 @@ describe('2FA API (e2e)', () => {
   }
 
   const CREATE_METHODS = `mutation($input: CreateMethodsInput!) {
-    create2faMethod(input: $input) { id method isActive isDeleted types tags }
+    createTwoFaMethod(input: $input) { id method isActive isDeleted types tags }
   }`;
-  const SEND_2FA = `mutation($input: Send2FaInput!) {
-    send2Fa(input: $input) { operationId types { type identity expire retry } }
+  const UPDATE_METHODS = `mutation($input: UpdateMethodsInput!) {
+    updateTwoFaMethod(input: $input) { id method isActive isDeleted types tags }
   }`;
-  const VERIFY_2FA = `mutation($input: Verify2faInput!) {
-    verify2fa(input: $input) { verified required userId identity }
+  const SEND_TWO_FA = `mutation($input: SendTwoFaInput!) {
+    sendTwoFa(input: $input) { operationId types { type identity expire retry } }
+  }`;
+  const VERIFY_TWO_FA = `mutation($input: VerifyTwoFaInput!) {
+    verifyTwoFa(input: $input) { verified required userId identity }
   }`;
 
   describe('настройка методов (админ)', () => {
-    it('create2faMethod без роли admin → HTTP-403 в формате ТЗ', async () => {
+    it('createTwoFaMethod без роли admin → HTTP-403 в формате ТЗ', async () => {
       const body = await gql(CREATE_METHODS, {
         input: { methods: [{ method: 'transfer', types: [], tags: [] }] },
       });
@@ -140,16 +143,16 @@ describe('2FA API (e2e)', () => {
         {
           input: {
             methods: [
-              { method: 'transfer', types: ['sms', 'email'], tags: ['user'] },
+              { method: 'transfer', types: ['SMS', 'EMAIL'], tags: ['USER'] },
               {
                 method: 'signin',
-                types: ['email'],
-                tags: ['unauthed', 'user'],
+                types: ['EMAIL'],
+                tags: ['UNAUTHED', 'USER'],
               },
               {
                 method: 'signup',
-                types: ['sms'],
-                tags: ['system', 'unauthed'],
+                types: ['SMS'],
+                tags: ['SYSTEM', 'UNAUTHED'],
               },
             ],
           },
@@ -157,7 +160,7 @@ describe('2FA API (e2e)', () => {
         ADMIN,
       );
       expect(body.errors).toBeUndefined();
-      const created = body.data!.create2faMethod as Array<{
+      const created = body.data!.createTwoFaMethod as Array<{
         id: string;
         method: string;
       }>;
@@ -169,12 +172,14 @@ describe('2FA API (e2e)', () => {
 
     it('все коды ошибок ТЗ воспроизводятся', async () => {
       const cases: Array<[string, GqlBody]> = [
+        // неизвестные tags/types в createTwoFaMethod теперь отсекает enum на
+        // валидации GraphQL, поэтому коды справочников проверяются через update
         [
           'UNKNOWN_TAG-001',
           await gql(
-            CREATE_METHODS,
+            UPDATE_METHODS,
             {
-              input: { methods: [{ method: 'x1', types: [], tags: ['vip'] }] },
+              input: { methods: [{ id: methodIds.transfer, tags: ['vip'] }] },
             },
             ADMIN,
           ),
@@ -182,23 +187,23 @@ describe('2FA API (e2e)', () => {
         [
           'UNKNOWN_METHOD-002',
           await gql(
-            `mutation { update2faMethod(input: { methods: [{ id: "99999999-9999-9999-9999-999999999999" }] }) { id } }`,
+            `mutation { updateTwoFaMethod(input: { methods: [{ id: "99999999-9999-9999-9999-999999999999" }] }) { id } }`,
             undefined,
             ADMIN,
           ),
         ],
         [
           'WRONG_METHOD-003',
-          await gql(SEND_2FA, {
+          await gql(SEND_TWO_FA, {
             input: { method: 'transfer', identity: SMS_IDENTITY },
           }),
         ],
         [
           'UNKNOWN_TYPE-004',
           await gql(
-            CREATE_METHODS,
+            UPDATE_METHODS,
             {
-              input: { methods: [{ method: 'x2', types: ['fax'], tags: [] }] },
+              input: { methods: [{ id: methodIds.transfer, types: ['fax'] }] },
             },
             ADMIN,
           ),
@@ -258,17 +263,17 @@ describe('2FA API (e2e)', () => {
     });
   });
 
-  describe('полный цикл: send2Fa → verify2fa', () => {
+  describe('полный цикл: sendTwoFa → verifyTwoFa', () => {
     let operationId: string;
 
-    it('send2Fa (authed transfer): маскированные identity, expire, retry', async () => {
+    it('sendTwoFa (authed transfer): маскированные identity, expire, retry', async () => {
       const body = await gql(
-        SEND_2FA,
+        SEND_TWO_FA,
         { input: { method: 'transfer' } },
         AUTHED,
       );
       expect(body.errors).toBeUndefined();
-      const result = body.data!.send2Fa;
+      const result = body.data!.sendTwoFa;
       operationId = result.operationId;
       expect(result.types).toEqual(
         expect.arrayContaining([
@@ -283,9 +288,9 @@ describe('2FA API (e2e)', () => {
       );
     });
 
-    it('verify2fa с чужим method → UNKNOWN_OPERATION-008', async () => {
+    it('verifyTwoFa с чужим method → UNKNOWN_OPERATION-008', async () => {
       const body = await gql(
-        VERIFY_2FA,
+        VERIFY_TWO_FA,
         {
           input: {
             operationId,
@@ -299,9 +304,9 @@ describe('2FA API (e2e)', () => {
       expect(body.errors![0].code).toBe('UNKNOWN_OPERATION-008');
     });
 
-    it('verify2fa с чужим userId → UNKNOWN_OPERATION-008', async () => {
+    it('verifyTwoFa с чужим userId → UNKNOWN_OPERATION-008', async () => {
       const body = await gql(
-        VERIFY_2FA,
+        VERIFY_TWO_FA,
         {
           input: {
             operationId,
@@ -315,16 +320,16 @@ describe('2FA API (e2e)', () => {
       expect(body.errors![0].code).toBe('UNKNOWN_OPERATION-008');
     });
 
-    it('verify2fa без роли service → HTTP-403', async () => {
-      const body = await gql(VERIFY_2FA, {
+    it('verifyTwoFa без роли service → HTTP-403', async () => {
+      const body = await gql(VERIFY_TWO_FA, {
         input: { operationId, method: 'transfer', userId: USER_ID, codes: [] },
       });
       expect(body.errors![0].code).toBe('HTTP-403');
     });
 
-    it('verify2fa с кодами из мок-паблишера → verified', async () => {
+    it('verifyTwoFa с кодами из мок-паблишера → verified', async () => {
       const body = await gql(
-        VERIFY_2FA,
+        VERIFY_TWO_FA,
         {
           input: {
             operationId,
@@ -339,7 +344,7 @@ describe('2FA API (e2e)', () => {
         SERVICE,
       );
       expect(body.errors).toBeUndefined();
-      expect(body.data!.verify2fa).toEqual({
+      expect(body.data!.verifyTwoFa).toEqual({
         verified: true,
         required: null,
         userId: USER_ID,
@@ -349,7 +354,7 @@ describe('2FA API (e2e)', () => {
 
     it('повторный verify той же операции → OPERATION_USED-010', async () => {
       const body = await gql(
-        VERIFY_2FA,
+        VERIFY_TWO_FA,
         {
           input: {
             operationId,
@@ -371,15 +376,15 @@ describe('2FA API (e2e)', () => {
     it('signup на незнакомый номер: код уходит, verify возвращает identity', async () => {
       const identity = '+7 999 000-11-22';
       const sendBody = await gql(
-        SEND_2FA,
+        SEND_TWO_FA,
         { input: { method: 'signup', identity } },
         { 'x-client-ip': '10.0.0.1' },
       );
       expect(sendBody.errors).toBeUndefined();
-      const operationId = sendBody.data!.send2Fa.operationId as string;
+      const operationId = sendBody.data!.sendTwoFa.operationId as string;
 
       const verifyBody = await gql(
-        VERIFY_2FA,
+        VERIFY_TWO_FA,
         {
           input: {
             operationId,
@@ -389,7 +394,7 @@ describe('2FA API (e2e)', () => {
         },
         SERVICE,
       );
-      expect(verifyBody.data!.verify2fa).toEqual({
+      expect(verifyBody.data!.verifyTwoFa).toEqual({
         verified: true,
         required: null,
         userId: null,
@@ -398,37 +403,37 @@ describe('2FA API (e2e)', () => {
     });
   });
 
-  describe('verify2fa без operationId — форма { required }', () => {
+  describe('verifyTwoFa без operationId — форма { required }', () => {
     it('покрытый метод authed-юзера → required: true', async () => {
       const body = await gql(
-        VERIFY_2FA,
+        VERIFY_TWO_FA,
         { input: { method: 'transfer', userId: USER_ID } },
         SERVICE,
       );
-      expect(body.data!.verify2fa.required).toBe(true);
+      expect(body.data!.verifyTwoFa.required).toBe(true);
     });
 
     it('неизвестный метод → required: false', async () => {
       const body = await gql(
-        VERIFY_2FA,
+        VERIFY_TWO_FA,
         { input: { method: 'ghost-method' } },
         SERVICE,
       );
-      expect(body.data!.verify2fa.required).toBe(false);
+      expect(body.data!.verifyTwoFa.required).toBe(false);
     });
 
     it('required по identity учитывает настройки юзера', async () => {
       const before = await gql(
-        VERIFY_2FA,
+        VERIFY_TWO_FA,
         { input: { method: 'signin', identity: EMAIL_IDENTITY } },
         SERVICE,
       );
-      expect(before.data!.verify2fa.required).toBe(true);
+      expect(before.data!.verifyTwoFa.required).toBe(true);
 
       // юзер отключает 2ФА на signin
       const updated = await gql(
         `mutation($input: UpdateMyMethodsInput!) {
-          updateMy2faMethod(input: $input) { id isActive types }
+          updateMyTwoFaMethod(input: $input) { id isActive types }
         }`,
         {
           input: {
@@ -440,11 +445,11 @@ describe('2FA API (e2e)', () => {
       expect(updated.errors).toBeUndefined();
 
       const after = await gql(
-        VERIFY_2FA,
+        VERIFY_TWO_FA,
         { input: { method: 'signin', identity: EMAIL_IDENTITY } },
         SERVICE,
       );
-      expect(after.data!.verify2fa.required).toBe(false);
+      expect(after.data!.verifyTwoFa.required).toBe(false);
     });
   });
 });

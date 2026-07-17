@@ -18,7 +18,7 @@ export enum OperationStatus {
   Failed = 'failed',
 }
 
-/** 2ФА-операция: её id — operationId из send2Fa / x-2fa-operationId. */
+/** 2ФА-операция: её id — operationId из sendTwoFa / x-2fa-operationId. */
 @Entity('operations')
 @Index(['identity', 'createdAt'])
 @Index(['userId', 'createdAt'])

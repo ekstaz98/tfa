@@ -1,6 +1,6 @@
 import { Field, ID, ObjectType } from '@nestjs/graphql';
 
-/** Элемент ответа twoFaTypes (Query 2faTypes из ТЗ). */
+/** Элемент ответа twoFaTypes (Query twoFaTypes из ТЗ). */
 @ObjectType('TwoFaType')
 export class TwoFaTypeDto {
   @Field(() => ID)

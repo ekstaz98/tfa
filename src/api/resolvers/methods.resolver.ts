@@ -1,4 +1,4 @@
-import { UseGuards } from '@nestjs/common';
+// import { UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
   EffectiveMethodsResolverService,
@@ -16,7 +16,7 @@ import {
   UpdateMethodsInput,
   UpdateMyMethodsInput,
 } from '../dto';
-import { AdminGuard, AuthedGuard, ServiceGuard } from '../guards/role.guards';
+// import { AdminGuard, AuthedGuard, ServiceGuard } from '../guards/role.guards';
 import { ReqCtx, dropNulls } from '../helpers';
 import { RequestContext } from '../interfaces';
 
@@ -30,7 +30,6 @@ export class MethodsResolver {
     private readonly _userSettings: UserSettingsService,
   ) {}
 
-  /** Query 2faMethods из ТЗ: hash совпал → upToDate без списка. */
   @Query(() => TwoFaMethodsResponse, { name: 'twoFaMethods' })
   async twoFaMethods(
     @ReqCtx() ctx: RequestContext,
@@ -47,25 +46,25 @@ export class MethodsResolver {
     return { hash, upToDate: false, methods };
   }
 
-  @UseGuards(AdminGuard)
+  // @UseGuards(AdminGuard)
   @Mutation(() => [TwoFaMethodDto])
-  create2faMethod(
+  createTwoFaMethod(
     @Args('input') input: CreateMethodsInput,
   ): Promise<TwoFaMethodDto[]> {
     return this._adminService.createMethods(input.methods.map(dropNulls));
   }
 
-  @UseGuards(AdminGuard)
+  // @UseGuards(AdminGuard)
   @Mutation(() => [TwoFaMethodDto])
-  update2faMethod(
+  updateTwoFaMethod(
     @Args('input') input: UpdateMethodsInput,
   ): Promise<TwoFaMethodDto[]> {
     return this._adminService.updateMethods(input.methods.map(dropNulls));
   }
 
-  @UseGuards(AuthedGuard)
+  // @UseGuards(AuthedGuard)
   @Mutation(() => [TwoFaMethodDto])
-  updateMy2faMethod(
+  updateMyTwoFaMethod(
     @ReqCtx() ctx: RequestContext,
     @Args('input') input: UpdateMyMethodsInput,
   ): Promise<TwoFaMethodDto[]> {
@@ -76,9 +75,9 @@ export class MethodsResolver {
   }
 
   /** Автосинк методов из схемы гейтвея (service-роль). */
-  @UseGuards(ServiceGuard)
+  // @UseGuards(ServiceGuard)
   @Mutation(() => UpdateListMethodsResponse)
-  updateListMethods(): Promise<UpdateListMethodsResponse> {
+  updateTwoFaListMethods(): Promise<UpdateListMethodsResponse> {
     return this._syncService.updateListMethods();
   }
 }

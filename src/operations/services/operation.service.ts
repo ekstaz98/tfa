@@ -31,9 +31,9 @@ import {
   CODE_SEND_PUBLISHER,
   CodeSendEvent,
   CodeSendPublisherPort,
-  Send2FaParams,
-  Send2FaResult,
-  Send2FaTypeView,
+  SendTwoFaParams,
+  SendTwoFaResult,
+  SendTwoFaTypeView,
   SendActor,
 } from '../interfaces';
 import { VerifierRegistry } from './verifier-registry';
@@ -59,7 +59,7 @@ interface PreparedType {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
-/** send2Fa: создание операции, генерация и публикация кодов, переотправка. */
+/** sendTwoFa: создание операции, генерация и публикация кодов, переотправка. */
 @Injectable()
 export class OperationService {
   private readonly _logger = new Logger(OperationService.name);
@@ -106,7 +106,7 @@ export class OperationService {
     );
   }
 
-  async send2Fa(params: Send2FaParams): Promise<Send2FaResult> {
+  async sendTwoFa(params: SendTwoFaParams): Promise<SendTwoFaResult> {
     const { method, tagNames } = await this._loadMethod(params.method);
     const actor = await this._resolveActor(params.actor, tagNames);
     if (params.operationId) {
@@ -118,11 +118,11 @@ export class OperationService {
   // ---------- создание операции ----------
 
   private async _createOperation(
-    params: Send2FaParams,
+    params: SendTwoFaParams,
     method: Method,
     tagNames: string[],
     actor: ActorContext,
-  ): Promise<Send2FaResult> {
+  ): Promise<SendTwoFaResult> {
     const isRegistration =
       tagNames.includes(TAG_SYSTEM) && tagNames.includes(TAG_UNAUTHED);
     const coreUserId = actor.authed
@@ -134,7 +134,7 @@ export class OperationService {
       effective.find((view) => view.id === method.id)?.types ?? [];
 
     // непокрытый метод: authed — честная ошибка (фронт видит покрытие),
-    // unauthed — пустышка, иначе send2Fa — оракул «юзер отключил 2ФА»
+    // unauthed — пустышка, иначе sendTwoFa — оракул «юзер отключил 2ФА»
     let dummy = false;
     let typeNames = effectiveTypes;
     if (effectiveTypes.length === 0) {
@@ -170,7 +170,7 @@ export class OperationService {
           manager,
         );
         const events: CodeSendEvent[] = [];
-        const views: Send2FaTypeView[] = [];
+        const views: SendTwoFaTypeView[] = [];
         for (const type of prepared) {
           if (type.selfVerified) {
             await this._codesCrud.create(
@@ -226,11 +226,11 @@ export class OperationService {
   // ---------- переотправка ----------
 
   private async _resend(
-    params: Send2FaParams,
+    params: SendTwoFaParams,
     method: Method,
     tagNames: string[],
     actor: ActorContext,
-  ): Promise<Send2FaResult> {
+  ): Promise<SendTwoFaResult> {
     const isRegistration =
       tagNames.includes(TAG_SYSTEM) && tagNames.includes(TAG_UNAUTHED);
     const { outbox, responseTypes, operationId } =
@@ -320,7 +320,7 @@ export class OperationService {
           0,
           Math.floor((activeOperation.expiresAt.getTime() - now) / 1000),
         );
-        const views: Send2FaTypeView[] = [];
+        const views: SendTwoFaTypeView[] = [];
         for (const [typeName, row] of rowByTypeName) {
           if (row.codeHash === null && row.lastSentAt === null) {
             views.push({
@@ -400,7 +400,7 @@ export class OperationService {
     if (!actor.identity) {
       throw new TwoFaError(
         TwoFaErrorCode.IdentityNotFound,
-        'identity is required for unauthenticated send2Fa',
+        'identity is required for unauthenticated sendTwoFa',
       );
     }
     const normalized = this._normalizer.normalize(actor.identity);
@@ -490,7 +490,7 @@ export class OperationService {
   }
 
   /**
-   * Анти-флуд, два измерения, под advisory lock — параллельные send2Fa
+   * Анти-флуд, два измерения, под advisory lock — параллельные sendTwoFa
    * не проскакивают порог. Пустышки учитываются наравне с настоящими.
    */
   private async _enforceLimits(

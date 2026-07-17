@@ -126,7 +126,7 @@ describe('UserSettingsService.updateMyMethods', () => {
     expect(userMethodTypesCrud.rows[0].typeId).toBe('type-sms');
   });
 
-  it('выключение типа = дифф user_method_types (бывший toggle2faForUser)', async () => {
+  it('выключение типа = дифф user_method_types (бывший toggleTwoFaForUser)', async () => {
     await service.updateMyMethods(CORE_USER_ID, [
       { id: transfer.id, types: ['sms', 'email'] },
     ]);

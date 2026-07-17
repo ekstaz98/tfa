@@ -23,7 +23,7 @@ interface Dictionaries {
   tagNameById: Map<string, string>;
 }
 
-/** create2faMethod / update2faMethod — конфигурация методов админом. */
+/** createTwoFaMethod / updateTwoFaMethod — конфигурация методов админом. */
 @Injectable()
 export class MethodsAdminService {
   constructor(

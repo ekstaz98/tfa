@@ -1,7 +1,7 @@
 import { Field, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
 
 @InputType()
-export class Send2FaInput {
+export class SendTwoFaInput {
   @Field()
   method: string;
 
@@ -19,7 +19,7 @@ export class Send2FaInput {
 }
 
 @ObjectType()
-export class Send2FaTypeDto {
+export class SendTwoFaTypeDto {
   @Field()
   type: string;
 
@@ -35,12 +35,12 @@ export class Send2FaTypeDto {
 }
 
 @ObjectType()
-export class Send2FaResponse {
+export class SendTwoFaResponse {
   @Field(() => ID)
   operationId: string;
 
-  @Field(() => [Send2FaTypeDto])
-  types: Send2FaTypeDto[];
+  @Field(() => [SendTwoFaTypeDto])
+  types: SendTwoFaTypeDto[];
 }
 
 @InputType()
@@ -53,7 +53,7 @@ export class VerifyCodeInput {
 }
 
 @InputType()
-export class Verify2faInput {
+export class VerifyTwoFaInput {
   /** Без operationId — форма «покрыт ли метод»: ответ { required }. */
   @Field(() => ID, { nullable: true })
   operationId?: string;
@@ -73,7 +73,7 @@ export class Verify2faInput {
 }
 
 @ObjectType()
-export class Verify2faResponse {
+export class VerifyTwoFaResponse {
   @Field(() => Boolean, { nullable: true })
   verified: boolean | null;
 

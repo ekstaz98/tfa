@@ -33,7 +33,7 @@ export class ServiceGuard extends RoleGuard {
   protected readonly _role = ROLE_SERVICE;
 }
 
-/** Для ручек юзера (updateMy2faMethod): требуется x-user-id. */
+/** Для ручек юзера (updateMyTwoFaMethod): требуется x-user-id. */
 @Injectable()
 export class AuthedGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {

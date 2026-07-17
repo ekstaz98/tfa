@@ -7,7 +7,7 @@ export interface SendActor {
   clientIp?: string | null;
 }
 
-export interface Send2FaParams {
+export interface SendTwoFaParams {
   method: string;
   actor: SendActor;
   /** Подмножество типов для переотправки; только вместе с operationId. */
@@ -17,14 +17,14 @@ export interface Send2FaParams {
   operationId?: string;
 }
 
-export interface Send2FaTypeView {
+export interface SendTwoFaTypeView {
   type: string;
   identity: string | null;
   expire: number | null;
   retry: number | null;
 }
 
-export interface Send2FaResult {
+export interface SendTwoFaResult {
   operationId: string;
-  types: Send2FaTypeView[];
+  types: SendTwoFaTypeView[];
 }

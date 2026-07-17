@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 /**
- * Нормализация identity на всех входах (send2Fa, verify, RMQ-консьюмер):
+ * Нормализация identity на всех входах (sendTwoFa, verify, RMQ-консьюмер):
  * email → trim + lowercase, phone → E.164. Иначе unique(type_id, identity)
  * и unauthed-поиск юзера ломаются на регистре/формате.
  */
@@ -26,7 +26,7 @@ export class IdentityNormalizerService {
 }
 
 /**
- * Маскирование identity для ответов send2Fa — отдельный чистый сервис.
+ * Маскирование identity для ответов sendTwoFa — отдельный чистый сервис.
  * Форматы из ТЗ: +7912...3345, gg...hm@gmail.com; краевые случаи
  * (короткая локальная часть, короткие номера) не падают.
  */

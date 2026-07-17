@@ -29,7 +29,7 @@ export class Method {
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  /** Участвует в вычислении hash для 2faMethods(hash). */
+  /** Участвует в вычислении hash для twoFaMethods(hash). */
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 }

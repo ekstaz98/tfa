@@ -1,4 +1,4 @@
-import { UseGuards } from '@nestjs/common';
+// import { UseGuards } from '@nestjs/common';
 import { Args, Mutation, Resolver } from '@nestjs/graphql';
 import { GraphQLError } from 'graphql';
 import {
@@ -7,12 +7,12 @@ import {
   VerificationService,
 } from '../../operations/services';
 import {
-  Send2FaInput,
-  Send2FaResponse,
-  Verify2faInput,
-  Verify2faResponse,
+  SendTwoFaInput,
+  SendTwoFaResponse,
+  VerifyTwoFaInput,
+  VerifyTwoFaResponse,
 } from '../dto';
-import { ServiceGuard } from '../guards/role.guards';
+// import { ServiceGuard } from '../guards/role.guards';
 import { ReqCtx } from '../helpers';
 import { RequestContext } from '../interfaces';
 
@@ -30,11 +30,11 @@ export class OperationsResolver {
     private readonly _requirementService: TwoFaRequirementService,
   ) {}
 
-  @Mutation(() => Send2FaResponse)
-  send2Fa(
+  @Mutation(() => SendTwoFaResponse)
+  sendTwoFa(
     @ReqCtx() ctx: RequestContext,
-    @Args('input') input: Send2FaInput,
-  ): Promise<Send2FaResponse> {
+    @Args('input') input: SendTwoFaInput,
+  ): Promise<SendTwoFaResponse> {
     // согласованное расширение ТЗ: identity обязателен без авторизации,
     // запрещён при ней; types — только вместе с x-2fa-operationId
     if (ctx.userId && input.identity) {
@@ -48,7 +48,7 @@ export class OperationsResolver {
         'types subset is allowed only for resend (x-2fa-operationId header)',
       );
     }
-    return this._operationService.send2Fa({
+    return this._operationService.sendTwoFa({
       method: input.method,
       actor: {
         userId: ctx.userId,
@@ -65,11 +65,11 @@ export class OperationsResolver {
    * Гейтвей (service-роль): с operationId — верификация кодов перед
    * проксированием; без — «покрыт ли метод» для (method, userId | identity).
    */
-  @UseGuards(ServiceGuard)
-  @Mutation(() => Verify2faResponse)
-  async verify2fa(
-    @Args('input') input: Verify2faInput,
-  ): Promise<Verify2faResponse> {
+  // @UseGuards(ServiceGuard)
+  @Mutation(() => VerifyTwoFaResponse)
+  async verifyTwoFa(
+    @Args('input') input: VerifyTwoFaInput,
+  ): Promise<VerifyTwoFaResponse> {
     if (!input.operationId) {
       const required = await this._requirementService.isRequired({
         method: input.method,

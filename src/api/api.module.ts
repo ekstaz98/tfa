@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { GraphQLModule } from '@nestjs/graphql';
 import { join } from 'path';
@@ -16,10 +17,12 @@ import { TypesResolver } from './resolvers/types.resolver';
       driver: ApolloDriver,
       autoSchemaFile: join(process.cwd(), 'schema.gql'),
       sortSchema: true,
-      // единая точка формата ошибок ТЗ — покрывает весь API, включая verify2fa
       formatError: formatGraphQlError,
       context: ({ req }: { req: unknown }) => ({ req }),
       playground: false,
+      plugins: [
+        ApolloServerPluginLandingPageLocalDefault({ embed: true }),
+      ] as ApolloDriverConfig['plugins'],
     }),
     DatabaseModule,
     MethodsModule,

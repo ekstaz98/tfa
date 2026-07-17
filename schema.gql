@@ -5,8 +5,8 @@
 input CreateMethodInputDto {
   isActive: Boolean
   method: String!
-  tags: [String!]!
-  types: [String!]!
+  tags: [TwoFaMethodTag!]!
+  types: [TwoFaMethodType!]!
 }
 
 input CreateMethodsInput {
@@ -14,12 +14,12 @@ input CreateMethodsInput {
 }
 
 type Mutation {
-  create2faMethod(input: CreateMethodsInput!): [TwoFaMethod!]!
-  send2Fa(input: Send2FaInput!): Send2FaResponse!
-  update2faMethod(input: UpdateMethodsInput!): [TwoFaMethod!]!
-  updateListMethods: UpdateListMethodsResponse!
-  updateMy2faMethod(input: UpdateMyMethodsInput!): [TwoFaMethod!]!
-  verify2fa(input: Verify2faInput!): Verify2faResponse!
+  createTwoFaMethod(input: CreateMethodsInput!): [TwoFaMethod!]!
+  sendTwoFa(input: SendTwoFaInput!): SendTwoFaResponse!
+  updateMyTwoFaMethod(input: UpdateMyMethodsInput!): [TwoFaMethod!]!
+  updateTwoFaListMethods: UpdateListMethodsResponse!
+  updateTwoFaMethod(input: UpdateMethodsInput!): [TwoFaMethod!]!
+  verifyTwoFa(input: VerifyTwoFaInput!): VerifyTwoFaResponse!
 }
 
 type Query {
@@ -27,19 +27,19 @@ type Query {
   twoFaTypes: [TwoFaType!]!
 }
 
-input Send2FaInput {
+input SendTwoFaInput {
   identity: String
   locale: String
   method: String!
   types: [String!]
 }
 
-type Send2FaResponse {
+type SendTwoFaResponse {
   operationId: ID!
-  types: [Send2FaTypeDto!]!
+  types: [SendTwoFaTypeDto!]!
 }
 
-type Send2FaTypeDto {
+type SendTwoFaTypeDto {
   expire: Int
   identity: String
   retry: Int
@@ -53,6 +53,20 @@ type TwoFaMethod {
   method: String!
   tags: [String!]!
   types: [String!]!
+}
+
+enum TwoFaMethodTag {
+  DEFAULT
+  SYSTEM
+  UNAUTHED
+  USER
+}
+
+enum TwoFaMethodType {
+  EMAIL
+  GA
+  PUSH
+  SMS
 }
 
 input TwoFaMethodsInput {
@@ -101,7 +115,12 @@ input UpdateMyMethodsInput {
   methods: [UpdateMyMethodInputDto!]!
 }
 
-input Verify2faInput {
+input VerifyCodeInput {
+  code: String!
+  type: String!
+}
+
+input VerifyTwoFaInput {
   codes: [VerifyCodeInput!]
   identity: String
   method: String!
@@ -109,14 +128,9 @@ input Verify2faInput {
   userId: String
 }
 
-type Verify2faResponse {
+type VerifyTwoFaResponse {
   identity: String
   required: Boolean
   userId: String
   verified: Boolean
-}
-
-input VerifyCodeInput {
-  code: String!
-  type: String!
 }

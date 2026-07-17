@@ -17,11 +17,11 @@ import { TAG_USER, TOTP_TYPE } from '../constants';
 import { MethodView, UpdateMyMethodInput } from '../interfaces';
 
 /**
- * updateMy2faMethod: переопределение методов юзером. Разрешено только
+ * updateMyTwoFaMethod: переопределение методов юзером. Разрешено только
  * для методов с тегом user; типы — подмножество типов метода; для каждого
  * выбранного типа обязан быть подтверждённый активный кред (для ga — с
  * секретом) — юзер не может запереть сам себя настройкой. Сюда же входит
- * вкл/выкл типов (бывший toggle2faForUser) — отдельного toggle нет.
+ * вкл/выкл типов (бывший toggleTwoFaForUser) — отдельного toggle нет.
  * Теги юзер не передаёт (user_method_tags заполняет система/админ).
  */
 @Injectable()

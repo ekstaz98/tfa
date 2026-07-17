@@ -9,7 +9,7 @@ import { RequirementParams } from '../interfaces';
 import { IdentityNormalizerService } from './identity.service';
 
 /**
- * verify2fa без operationId: покрыт ли метод 2ФА для (userId | identity).
+ * verifyTwoFa без operationId: покрыт ли метод 2ФА для (userId | identity).
  * Для unauthed-методов identity резолвится в юзера — ответ по его настройкам,
  * поэтому юзер может полностью отключить 2ФА на signin. Неизвестный identity →
  * ответ по конфигурации метода; неизвестный/неактивный метод → false

@@ -53,7 +53,7 @@ async function waitFor<T>(
 /**
  * Сквозной сценарий скелета (этап 8 плана): регистрация по незнакомому
  * identity → событие создания юзера из интегрирующей системы → signin по
- * identity с 2ФА → настройка юзера → transfer через verify2fa.
+ * identity с 2ФА → настройка юзера → transfer через verifyTwoFa.
  * Коды читаются из мок-реализации порта отправки — API чтения кодов нет.
  */
 describe('Сквозной флоу 2ФА (e2e)', () => {
@@ -126,31 +126,31 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
     return event.data.data.code;
   }
 
-  const SEND_2FA = `mutation($input: Send2FaInput!) {
-    send2Fa(input: $input) { operationId types { type identity expire retry } }
+  const SEND_TWO_FA = `mutation($input: SendTwoFaInput!) {
+    sendTwoFa(input: $input) { operationId types { type identity expire retry } }
   }`;
-  const VERIFY_2FA = `mutation($input: Verify2faInput!) {
-    verify2fa(input: $input) { verified required userId identity }
+  const VERIFY_TWO_FA = `mutation($input: VerifyTwoFaInput!) {
+    verifyTwoFa(input: $input) { verified required userId identity }
   }`;
 
   it('0. админ настраивает методы: signup, signin, transfer', async () => {
     const body = await gql(
       `mutation($input: CreateMethodsInput!) {
-        create2faMethod(input: $input) { id method }
+        createTwoFaMethod(input: $input) { id method }
       }`,
       {
         input: {
           methods: [
-            { method: 'signup', types: ['sms'], tags: ['system', 'unauthed'] },
-            { method: 'signin', types: ['email'], tags: ['unauthed', 'user'] },
-            { method: 'transfer', types: ['sms', 'email'], tags: ['user'] },
+            { method: 'signup', types: ['SMS'], tags: ['SYSTEM', 'UNAUTHED'] },
+            { method: 'signin', types: ['EMAIL'], tags: ['UNAUTHED', 'USER'] },
+            { method: 'transfer', types: ['SMS', 'EMAIL'], tags: ['USER'] },
           ],
         },
       },
       ADMIN,
     );
     expect(body.errors).toBeUndefined();
-    for (const view of body.data!.create2faMethod as Array<{
+    for (const view of body.data!.createTwoFaMethod as Array<{
       id: string;
       method: string;
     }>) {
@@ -160,16 +160,16 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
 
   it('1. регистрация: код на незнакомый номер, verify подтверждает владение каналом', async () => {
     const sendBody = await gql(
-      SEND_2FA,
+      SEND_TWO_FA,
       { input: { method: 'signup', identity: PHONE_RAW } },
       { 'x-client-ip': '10.1.1.1' },
     );
     expect(sendBody.errors).toBeUndefined();
-    const operationId = sendBody.data!.send2Fa.operationId as string;
-    expect(sendBody.data!.send2Fa.types[0].identity).toBe('+7912...3345');
+    const operationId = sendBody.data!.sendTwoFa.operationId as string;
+    expect(sendBody.data!.sendTwoFa.types[0].identity).toBe('+7912...3345');
 
     const verifyBody = await gql(
-      VERIFY_2FA,
+      VERIFY_TWO_FA,
       {
         input: {
           operationId,
@@ -179,7 +179,7 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
       },
       SERVICE,
     );
-    expect(verifyBody.data!.verify2fa).toEqual({
+    expect(verifyBody.data!.verifyTwoFa).toEqual({
       verified: true,
       required: null,
       userId: null,
@@ -213,23 +213,23 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
 
   it('3. signin по identity: гейтвей узнаёт required и кто прошёл проверку', async () => {
     const required = await gql(
-      VERIFY_2FA,
+      VERIFY_TWO_FA,
       { input: { method: 'signin', identity: EMAIL } },
       SERVICE,
     );
-    expect(required.data!.verify2fa.required).toBe(true);
+    expect(required.data!.verifyTwoFa.required).toBe(true);
 
-    const sendBody = await gql(SEND_2FA, {
+    const sendBody = await gql(SEND_TWO_FA, {
       input: { method: 'signin', identity: ` ${EMAIL_RAW} ` },
     });
     expect(sendBody.errors).toBeUndefined();
-    const operationId = sendBody.data!.send2Fa.operationId as string;
-    expect(sendBody.data!.send2Fa.types).toEqual([
+    const operationId = sendBody.data!.sendTwoFa.operationId as string;
+    expect(sendBody.data!.sendTwoFa.types).toEqual([
       { type: 'email', identity: 'u...r@mail.com', expire: 300, retry: 120 },
     ]);
 
     const verifyBody = await gql(
-      VERIFY_2FA,
+      VERIFY_TWO_FA,
       {
         input: {
           operationId,
@@ -240,7 +240,7 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
       SERVICE,
     );
     // гейтвею для логина нужно знать, кто прошёл проверку
-    expect(verifyBody.data!.verify2fa).toEqual({
+    expect(verifyBody.data!.verifyTwoFa).toEqual({
       verified: true,
       required: null,
       userId: CORE_USER,
@@ -248,16 +248,16 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
     });
   });
 
-  it('4. юзер сужает transfer до email через updateMy2faMethod', async () => {
+  it('4. юзер сужает transfer до email через updateMyTwoFaMethod', async () => {
     const body = await gql(
       `mutation($input: UpdateMyMethodsInput!) {
-        updateMy2faMethod(input: $input) { id method isActive types tags }
+        updateMyTwoFaMethod(input: $input) { id method isActive types tags }
       }`,
       { input: { methods: [{ id: methodIds.transfer, types: ['email'] }] } },
       AUTHED,
     );
     expect(body.errors).toBeUndefined();
-    expect(body.data!.updateMy2faMethod[0].types).toEqual(['email']);
+    expect(body.data!.updateMyTwoFaMethod[0].types).toEqual(['email']);
 
     const methods = await gql(
       `{ twoFaMethods { methods { method types } } }`,
@@ -273,28 +273,28 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
     expect(transfer?.types).toEqual(['email']);
   });
 
-  it('5. transfer: required → send2Fa по настройкам юзера → verify2fa', async () => {
+  it('5. transfer: required → sendTwoFa по настройкам юзера → verifyTwoFa', async () => {
     const required = await gql(
-      VERIFY_2FA,
+      VERIFY_TWO_FA,
       { input: { method: 'transfer', userId: CORE_USER } },
       SERVICE,
     );
-    expect(required.data!.verify2fa.required).toBe(true);
+    expect(required.data!.verifyTwoFa.required).toBe(true);
 
     const sendBody = await gql(
-      SEND_2FA,
+      SEND_TWO_FA,
       { input: { method: 'transfer' } },
       AUTHED,
     );
     expect(sendBody.errors).toBeUndefined();
-    const operationId = sendBody.data!.send2Fa.operationId as string;
+    const operationId = sendBody.data!.sendTwoFa.operationId as string;
     // после переопределения — один email-код, не sms+email
-    expect(sendBody.data!.send2Fa.types).toEqual([
+    expect(sendBody.data!.sendTwoFa.types).toEqual([
       { type: 'email', identity: 'u...r@mail.com', expire: 300, retry: 120 },
     ]);
 
     const verifyBody = await gql(
-      VERIFY_2FA,
+      VERIFY_TWO_FA,
       {
         input: {
           operationId,
@@ -305,6 +305,6 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
       },
       SERVICE,
     );
-    expect(verifyBody.data!.verify2fa.verified).toBe(true);
+    expect(verifyBody.data!.verifyTwoFa.verified).toBe(true);
   });
 });

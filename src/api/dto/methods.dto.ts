@@ -1,6 +1,30 @@
-import { Field, ID, InputType, ObjectType } from '@nestjs/graphql';
+import {
+  Field,
+  ID,
+  InputType,
+  ObjectType,
+  registerEnumType,
+} from '@nestjs/graphql';
 
-/** Элемент ответа twoFaMethods (Query 2faMethods из ТЗ). */
+/** Справочник типов доставки кода (сид SeedDictionaries). */
+export enum TwoFaMethodType {
+  SMS = 'sms',
+  EMAIL = 'email',
+  PUSH = 'push',
+  GA = 'ga',
+}
+registerEnumType(TwoFaMethodType, { name: 'TwoFaMethodType' });
+
+/** Справочник тегов метода (сид SeedDictionaries). */
+export enum TwoFaMethodTag {
+  UNAUTHED = 'unauthed',
+  USER = 'user',
+  SYSTEM = 'system',
+  DEFAULT = 'default',
+}
+registerEnumType(TwoFaMethodTag, { name: 'TwoFaMethodTag' });
+
+/** Элемент ответа twoFaMethods (Query twoFaMethods из ТЗ). */
 @ObjectType('TwoFaMethod')
 export class TwoFaMethodDto {
   @Field(() => ID)
@@ -57,11 +81,11 @@ export class CreateMethodInputDto {
   @Field({ nullable: true })
   isActive?: boolean;
 
-  @Field(() => [String])
-  types: string[];
+  @Field(() => [TwoFaMethodType])
+  types: TwoFaMethodType[];
 
-  @Field(() => [String])
-  tags: string[];
+  @Field(() => [TwoFaMethodTag])
+  tags: TwoFaMethodTag[];
 }
 
 @InputType()

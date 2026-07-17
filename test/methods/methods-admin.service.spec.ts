@@ -62,7 +62,7 @@ describe('MethodsAdminService', () => {
   }
 
   describe('createMethods', () => {
-    it('создаёт метод со связями и возвращает вид 2faMethods', async () => {
+    it('создаёт метод со связями и возвращает вид twoFaMethods', async () => {
       const views = await service.createMethods([
         { method: 'transfer', types: ['email', 'sms'], tags: ['user'] },
       ]);
