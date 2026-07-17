@@ -172,10 +172,11 @@ describe('2FA API (e2e)', () => {
 
     it('все коды ошибок ТЗ воспроизводятся', async () => {
       const cases: Array<[string, GqlBody]> = [
-        // неизвестные tags/types в createTwoFaMethod теперь отсекает enum на
-        // валидации GraphQL, поэтому коды справочников проверяются через update
+        // tags в create/update — enum: неизвестное значение отсекается на
+        // валидации GraphQL (BAD_REQUEST-400), UNKNOWN_TAG-001 через API
+        // недостижим и покрыт юнитом methods-admin.service.spec
         [
-          'UNKNOWN_TAG-001',
+          'BAD_REQUEST-400',
           await gql(
             UPDATE_METHODS,
             {
@@ -198,14 +199,18 @@ describe('2FA API (e2e)', () => {
             input: { method: 'transfer', identity: SMS_IDENTITY },
           }),
         ],
+        // types — enum, несуществующий тип отсекается валидацией GraphQL;
+        // UNKNOWN_TYPE-004 достижим валидным типом вне типов метода
         [
           'UNKNOWN_TYPE-004',
           await gql(
-            UPDATE_METHODS,
+            `mutation($input: UpdateMyMethodsInput!) {
+              updateMyTwoFaMethod(input: $input) { id }
+            }`,
             {
-              input: { methods: [{ id: methodIds.transfer, types: ['fax'] }] },
+              input: { methods: [{ id: methodIds.transfer, types: ['PUSH'] }] },
             },
-            ADMIN,
+            AUTHED,
           ),
         ],
         [
@@ -296,7 +301,7 @@ describe('2FA API (e2e)', () => {
             operationId,
             method: 'signin',
             userId: USER_ID,
-            codes: [{ type: 'sms', code: '000000' }],
+            codes: [{ type: 'SMS', code: '000000' }],
           },
         },
         SERVICE,
@@ -312,7 +317,7 @@ describe('2FA API (e2e)', () => {
             operationId,
             method: 'transfer',
             userId: '22222222-2222-2222-2222-222222222222',
-            codes: [{ type: 'sms', code: '000000' }],
+            codes: [{ type: 'SMS', code: '000000' }],
           },
         },
         SERVICE,
@@ -336,8 +341,8 @@ describe('2FA API (e2e)', () => {
             method: 'transfer',
             userId: USER_ID,
             codes: [
-              { type: 'sms', code: codeFor(operationId, 'sms') },
-              { type: 'email', code: codeFor(operationId, 'email') },
+              { type: 'SMS', code: codeFor(operationId, 'sms') },
+              { type: 'EMAIL', code: codeFor(operationId, 'email') },
             ],
           },
         },
@@ -361,8 +366,8 @@ describe('2FA API (e2e)', () => {
             method: 'transfer',
             userId: USER_ID,
             codes: [
-              { type: 'sms', code: '000000' },
-              { type: 'email', code: '000000' },
+              { type: 'SMS', code: '000000' },
+              { type: 'EMAIL', code: '000000' },
             ],
           },
         },
@@ -389,7 +394,7 @@ describe('2FA API (e2e)', () => {
           input: {
             operationId,
             method: 'signup',
-            codes: [{ type: 'sms', code: codeFor(operationId, 'sms') }],
+            codes: [{ type: 'SMS', code: codeFor(operationId, 'sms') }],
           },
         },
         SERVICE,

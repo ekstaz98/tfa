@@ -174,7 +174,7 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
         input: {
           operationId,
           method: 'signup',
-          codes: [{ type: 'sms', code: lastCodeFor(operationId) }],
+          codes: [{ type: 'SMS', code: lastCodeFor(operationId) }],
         },
       },
       SERVICE,
@@ -234,7 +234,7 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
         input: {
           operationId,
           method: 'signin',
-          codes: [{ type: 'email', code: lastCodeFor(operationId) }],
+          codes: [{ type: 'EMAIL', code: lastCodeFor(operationId) }],
         },
       },
       SERVICE,
@@ -253,7 +253,7 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
       `mutation($input: UpdateMyMethodsInput!) {
         updateMyTwoFaMethod(input: $input) { id method isActive types tags }
       }`,
-      { input: { methods: [{ id: methodIds.transfer, types: ['email'] }] } },
+      { input: { methods: [{ id: methodIds.transfer, types: ['EMAIL'] }] } },
       AUTHED,
     );
     expect(body.errors).toBeUndefined();
@@ -300,7 +300,7 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
           operationId,
           method: 'transfer',
           userId: CORE_USER,
-          codes: [{ type: 'email', code: lastCodeFor(operationId) }],
+          codes: [{ type: 'EMAIL', code: lastCodeFor(operationId) }],
         },
       },
       SERVICE,

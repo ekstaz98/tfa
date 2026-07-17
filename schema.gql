@@ -31,7 +31,7 @@ input SendTwoFaInput {
   identity: String
   locale: String
   method: String!
-  types: [String!]
+  types: [TwoFaMethodType!]
 }
 
 type SendTwoFaResponse {
@@ -71,7 +71,7 @@ enum TwoFaMethodType {
 
 input TwoFaMethodsInput {
   hash: String
-  tags: [String!]
+  tags: [TwoFaMethodTag!]
 }
 
 type TwoFaMethodsResponse {
@@ -97,8 +97,8 @@ input UpdateMethodInputDto {
   isActive: Boolean
   isDeleted: Boolean
   method: String
-  tags: [String!]
-  types: [String!]
+  tags: [TwoFaMethodTag!]
+  types: [TwoFaMethodType!]
 }
 
 input UpdateMethodsInput {
@@ -108,7 +108,7 @@ input UpdateMethodsInput {
 input UpdateMyMethodInputDto {
   id: ID!
   isActive: Boolean
-  types: [String!]
+  types: [TwoFaMethodType!]
 }
 
 input UpdateMyMethodsInput {
@@ -117,7 +117,7 @@ input UpdateMyMethodsInput {
 
 input VerifyCodeInput {
   code: String!
-  type: String!
+  type: TwoFaMethodType!
 }
 
 input VerifyTwoFaInput {

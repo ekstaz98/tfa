@@ -52,8 +52,8 @@ export class TwoFaMethodsInput {
   @Field({ nullable: true })
   hash?: string;
 
-  @Field(() => [String], { nullable: true })
-  tags?: string[];
+  @Field(() => [TwoFaMethodTag], { nullable: true })
+  tags?: TwoFaMethodTag[];
 }
 
 @ObjectType()
@@ -108,11 +108,11 @@ export class UpdateMethodInputDto {
   @Field({ nullable: true })
   isDeleted?: boolean;
 
-  @Field(() => [String], { nullable: true })
-  types?: string[];
+  @Field(() => [TwoFaMethodType], { nullable: true })
+  types?: TwoFaMethodType[];
 
-  @Field(() => [String], { nullable: true })
-  tags?: string[];
+  @Field(() => [TwoFaMethodTag], { nullable: true })
+  tags?: TwoFaMethodTag[];
 }
 
 @InputType()
@@ -130,8 +130,8 @@ export class UpdateMyMethodInputDto {
   @Field({ nullable: true })
   isActive?: boolean;
 
-  @Field(() => [String], { nullable: true })
-  types?: string[];
+  @Field(() => [TwoFaMethodType], { nullable: true })
+  types?: TwoFaMethodType[];
 }
 
 @InputType()

@@ -1,4 +1,5 @@
 import { Field, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
+import { TwoFaMethodType } from './methods.dto';
 
 @InputType()
 export class SendTwoFaInput {
@@ -10,8 +11,8 @@ export class SendTwoFaInput {
   identity?: string;
 
   /** Подмножество типов — только для переотправки (x-2fa-operationId). */
-  @Field(() => [String], { nullable: true })
-  types?: string[];
+  @Field(() => [TwoFaMethodType], { nullable: true })
+  types?: TwoFaMethodType[];
 
   /** Прокидывается в событие отправки — продукт мультиязычный. */
   @Field({ nullable: true })
@@ -45,8 +46,8 @@ export class SendTwoFaResponse {
 
 @InputType()
 export class VerifyCodeInput {
-  @Field()
-  type: string;
+  @Field(() => TwoFaMethodType)
+  type: TwoFaMethodType;
 
   @Field()
   code: string;
