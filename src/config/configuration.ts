@@ -33,6 +33,10 @@ export interface AppConfig {
     /** Завершённые/истёкшие операции старше периода удаляются джобом. */
     days: number;
   };
+  dictionaries: {
+    /** TTL in-memory кэша справочников types/tags. */
+    cacheTtlSeconds: number;
+  };
   totpCipher: {
     /** Версия ключа, которой шифруются новые секреты. */
     currentVersion: string;
@@ -75,6 +79,9 @@ export default (): AppConfig => ({
   },
   retention: {
     days: Number(process.env.RETENTION_DAYS ?? 30),
+  },
+  dictionaries: {
+    cacheTtlSeconds: Number(process.env.DICTIONARIES_CACHE_TTL_SECONDS ?? 30),
   },
   totpCipher: {
     currentVersion: process.env.TOTP_ENC_KEY_VERSION as string,

@@ -22,8 +22,10 @@ import {
   FakeOperationsCrud,
   fakeConfig,
   fakeDataSource,
+  fakeDictionaryCache,
   seedDictionaries,
 } from '../testing/fakes';
+import { DictionaryCacheService } from '../../src/database/services';
 import { CodeGeneratorService } from '../../src/operations/services';
 import {
   IdentityMaskerService,
@@ -63,6 +65,7 @@ export interface OperationsTestBed {
   codeGenerator: CodeGeneratorService;
   verifierRegistry: VerifierRegistry;
   effectiveMethods: EffectiveMethodsResolverService;
+  dictionaryCache: DictionaryCacheService;
   masker: IdentityMaskerService;
   normalizer: IdentityNormalizerService;
   crud: {
@@ -132,6 +135,7 @@ export function buildTestBed(): OperationsTestBed {
     } as Partial<Code>),
   };
   seedDictionaries(crud.tags, crud.types);
+  const dictionaryCache = fakeDictionaryCache(crud.types, crud.tags);
 
   const cipher = new CredentialCipherService(config);
   const codeGenerator = new CodeGeneratorService(config);
@@ -147,8 +151,7 @@ export function buildTestBed(): OperationsTestBed {
     crud.methodTags as any,
     crud.userMethods as any,
     crud.userMethodTypes as any,
-    crud.types as any,
-    crud.tags as any,
+    dictionaryCache,
   );
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -160,6 +163,7 @@ export function buildTestBed(): OperationsTestBed {
     codeGenerator,
     verifierRegistry,
     effectiveMethods,
+    dictionaryCache,
     masker: new IdentityMaskerService(),
     normalizer: new IdentityNormalizerService(),
     crud,

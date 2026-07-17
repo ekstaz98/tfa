@@ -3,9 +3,8 @@ import { EntityManager, In } from 'typeorm';
 import {
   MethodTagsCrudService,
   MethodTypesCrudService,
-  TagsCrudService,
-  TypesCrudService,
 } from '../../database/crud';
+import { DictionaryCacheService } from '../../database/services';
 import { Method } from '../../database/entities';
 import { MethodView } from '../interfaces';
 
@@ -15,8 +14,7 @@ export class MethodViewsService {
   constructor(
     private readonly _methodTypesCrud: MethodTypesCrudService,
     private readonly _methodTagsCrud: MethodTagsCrudService,
-    private readonly _typesCrud: TypesCrudService,
-    private readonly _tagsCrud: TagsCrudService,
+    private readonly _dictionaryCache: DictionaryCacheService,
   ) {}
 
   async buildViews(
@@ -27,14 +25,12 @@ export class MethodViewsService {
       return [];
     }
     const methodIds = methods.map((method) => method.id);
-    const [typeRows, tagRows, types, tags] = await Promise.all([
-      this._methodTypesCrud.findBy({ methodId: In(methodIds) }, manager),
-      this._methodTagsCrud.findBy({ methodId: In(methodIds) }, manager),
-      this._typesCrud.findBy({}, manager),
-      this._tagsCrud.findBy({}, manager),
-    ]);
-    const typeNameById = new Map(types.map((type) => [type.id, type.type]));
-    const tagNameById = new Map(tags.map((tag) => [tag.id, tag.name]));
+    const [typeRows, tagRows, { typeNameById, tagNameById }] =
+      await Promise.all([
+        this._methodTypesCrud.findBy({ methodId: In(methodIds) }, manager),
+        this._methodTagsCrud.findBy({ methodId: In(methodIds) }, manager),
+        this._dictionaryCache.get(),
+      ]);
 
     return methods.map((method) => ({
       id: method.id,

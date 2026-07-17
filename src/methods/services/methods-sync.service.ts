@@ -29,29 +29,24 @@ export class MethodsSyncService {
     const existing = await this._methodsCrud.findBy({ isDeleted: false });
     const knownNames = new Set(existing.map((method) => method.method));
 
-    const created: string[] = [];
-    const deactivated: string[] = [];
+    const toDeactivate = existing.filter(
+      (method) => !gatewayNames.has(method.method) && method.isActive,
+    );
+    const toCreate = [...gatewayNames].filter((name) => !knownNames.has(name));
     await this._dataSource.transaction(async (manager) => {
-      for (const method of existing) {
-        if (!gatewayNames.has(method.method) && method.isActive) {
-          await this._methodsCrud.update(
-            method.id,
-            { isActive: false },
-            manager,
-          );
-          deactivated.push(method.method);
-        }
-      }
-      for (const name of gatewayNames) {
-        if (!knownNames.has(name)) {
-          await this._methodsCrud.create(
-            { method: name, isActive: true },
-            manager,
-          );
-          created.push(name);
-        }
-      }
+      await this._methodsCrud.updateMany(
+        toDeactivate.map((method) => method.id),
+        { isActive: false },
+        manager,
+      );
+      await this._methodsCrud.createMany(
+        toCreate.map((name) => ({ method: name, isActive: true })),
+        manager,
+      );
     });
-    return { created, deactivated };
+    return {
+      created: toCreate,
+      deactivated: toDeactivate.map((method) => method.method),
+    };
   }
 }

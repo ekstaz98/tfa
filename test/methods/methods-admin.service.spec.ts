@@ -10,7 +10,12 @@ import {
   MethodViewsService,
   MethodsAdminService,
 } from '../../src/methods/services';
-import { FakeCrud, fakeDataSource, seedDictionaries } from '../testing/fakes';
+import {
+  FakeCrud,
+  fakeDataSource,
+  fakeDictionaryCache,
+  seedDictionaries,
+} from '../testing/fakes';
 
 describe('MethodsAdminService', () => {
   let methodsCrud: FakeCrud<Method>;
@@ -31,19 +36,18 @@ describe('MethodsAdminService', () => {
     tagsCrud = new FakeCrud<Tag>();
     seedDictionaries(tagsCrud, typesCrud);
     /* eslint-disable @typescript-eslint/no-explicit-any */
+    const dictionaryCache = fakeDictionaryCache(typesCrud, tagsCrud);
     const views = new MethodViewsService(
       methodTypesCrud as any,
       methodTagsCrud as any,
-      typesCrud as any,
-      tagsCrud as any,
+      dictionaryCache,
     );
     service = new MethodsAdminService(
       fakeDataSource(),
       methodsCrud as any,
       methodTypesCrud as any,
       methodTagsCrud as any,
-      typesCrud as any,
-      tagsCrud as any,
+      dictionaryCache,
       views,
     );
     /* eslint-enable @typescript-eslint/no-explicit-any */

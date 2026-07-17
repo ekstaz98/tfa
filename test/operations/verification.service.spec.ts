@@ -36,7 +36,7 @@ describe('VerificationService.verify', () => {
       bed.crud.users as any,
       bed.crud.operations as any,
       bed.crud.codes as any,
-      bed.crud.types as any,
+      bed.dictionaryCache,
       bed.verifierRegistry,
     );
     /* eslint-enable @typescript-eslint/no-explicit-any */

@@ -28,6 +28,7 @@ import {
   UserMethodsCrudService,
   UsersCrudService,
 } from './crud';
+import { DictionaryCacheService } from './services';
 
 const CRUD_SERVICES = [
   TypesCrudService,
@@ -61,7 +62,7 @@ const CRUD_SERVICES = [
       Code,
     ]),
   ],
-  providers: CRUD_SERVICES,
-  exports: CRUD_SERVICES,
+  providers: [...CRUD_SERVICES, DictionaryCacheService],
+  exports: [...CRUD_SERVICES, DictionaryCacheService],
 })
 export class DatabaseModule {}

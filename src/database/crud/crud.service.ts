@@ -30,6 +30,15 @@ export abstract class CrudService<T extends HasId> {
     return repo.save(repo.create(data));
   }
 
+  /** Батч-вставка одним INSERT; пустой массив — no-op. */
+  createMany(data: DeepPartial<T>[], manager?: EntityManager): Promise<T[]> {
+    if (data.length === 0) {
+      return Promise.resolve([]);
+    }
+    const repo = this.repo(manager);
+    return repo.save(repo.create(data));
+  }
+
   findById(id: string, manager?: EntityManager): Promise<T | null> {
     return this.repo(manager).findOneBy({
       id,
@@ -51,9 +60,29 @@ export abstract class CrudService<T extends HasId> {
     await this.repo(manager).update(id, data);
   }
 
+  /** Один UPDATE по списку id; пустой массив — no-op. */
+  async updateMany(
+    ids: string[],
+    data: QueryDeepPartialEntity<T>,
+    manager?: EntityManager,
+  ): Promise<void> {
+    if (ids.length === 0) {
+      return;
+    }
+    await this.repo(manager).update(ids, data);
+  }
+
   /** Жёсткое удаление — для junction-таблиц без is_deleted (дифф связей). */
   async delete(id: string, manager?: EntityManager): Promise<void> {
     await this.repo(manager).delete(id);
+  }
+
+  /** Один DELETE по списку id; пустой массив — no-op. */
+  async deleteMany(ids: string[], manager?: EntityManager): Promise<void> {
+    if (ids.length === 0) {
+      return;
+    }
+    await this.repo(manager).delete(ids);
   }
 }
 

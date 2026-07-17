@@ -4,9 +4,8 @@ import {
   MethodTagsCrudService,
   MethodTypesCrudService,
   MethodsCrudService,
-  TagsCrudService,
-  TypesCrudService,
 } from '../../database/crud';
+import { DictionaryCacheService } from '../../database/services';
 import { Method } from '../../database/entities';
 import { TwoFaError, TwoFaErrorCode } from '../../errors';
 import { MODE_TAGS, TAG_SYSTEM } from '../constants';
@@ -31,8 +30,7 @@ export class MethodsAdminService {
     private readonly _methodsCrud: MethodsCrudService,
     private readonly _methodTypesCrud: MethodTypesCrudService,
     private readonly _methodTagsCrud: MethodTagsCrudService,
-    private readonly _typesCrud: TypesCrudService,
-    private readonly _tagsCrud: TagsCrudService,
+    private readonly _dictionaryCache: DictionaryCacheService,
     private readonly _methodViews: MethodViewsService,
   ) {}
 
@@ -187,14 +185,11 @@ export class MethodsAdminService {
   }
 
   private async _loadDictionaries(): Promise<Dictionaries> {
-    const [types, tags] = await Promise.all([
-      this._typesCrud.findBy({ isActive: true, isDeleted: false }),
-      this._tagsCrud.findBy({ isActive: true }),
-    ]);
+    const snapshot = await this._dictionaryCache.get();
     return {
-      typeIdByName: new Map(types.map((type) => [type.type, type.id])),
-      tagIdByName: new Map(tags.map((tag) => [tag.name, tag.id])),
-      tagNameById: new Map(tags.map((tag) => [tag.id, tag.name])),
+      typeIdByName: snapshot.activeTypeIdByName,
+      tagIdByName: snapshot.activeTagIdByName,
+      tagNameById: snapshot.activeTagNameById,
     };
   }
 
@@ -244,15 +239,17 @@ export class MethodsAdminService {
     tagIds: string[],
     manager: EntityManager,
   ): Promise<void> {
-    for (const typeId of typeIds) {
-      await this._methodTypesCrud.create({ methodId, typeId }, manager);
-    }
-    for (const tagId of tagIds) {
-      await this._methodTagsCrud.create({ methodId, tagId }, manager);
-    }
+    await this._methodTypesCrud.createMany(
+      typeIds.map((typeId) => ({ methodId, typeId })),
+      manager,
+    );
+    await this._methodTagsCrud.createMany(
+      tagIds.map((tagId) => ({ methodId, tagId })),
+      manager,
+    );
   }
 
-  /** Связи меняются диффом: лишние строки удаляются, недостающие создаются. */
+  /** Связи меняются диффом: лишние строки удаляются, недостающие создаются — батчами. */
   private async _diffLinks(
     crud: MethodTypesCrudService | MethodTagsCrudService,
     methodId: string,
@@ -263,17 +260,20 @@ export class MethodsAdminService {
     const current = await crud.findBy({ methodId }, manager);
     const target = new Set(targetIds);
     const existing = new Set<string>();
+    const surplusRowIds: string[] = [];
     for (const row of current as unknown as Array<Record<string, string>>) {
       if (!target.has(row[fkField])) {
-        await crud.delete(row.id, manager);
+        surplusRowIds.push(row.id);
       } else {
         existing.add(row[fkField]);
       }
     }
-    for (const id of target) {
-      if (!existing.has(id)) {
-        await crud.create({ methodId, [fkField]: id }, manager);
-      }
-    }
+    await crud.deleteMany(surplusRowIds, manager);
+    await crud.createMany(
+      [...target]
+        .filter((id) => !existing.has(id))
+        .map((id) => ({ methodId, [fkField]: id })),
+      manager,
+    );
   }
 }

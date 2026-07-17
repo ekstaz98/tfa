@@ -1,23 +1,23 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DataSource, EntityManager, MoreThanOrEqual } from 'typeorm';
+import { DataSource, EntityManager, In, MoreThanOrEqual } from 'typeorm';
 import {
   CodesCrudService,
   MethodTagsCrudService,
   MethodTypesCrudService,
   MethodsCrudService,
   OperationsCrudService,
-  TagsCrudService,
-  TypesCrudService,
   UserCredentialsCrudService,
   UsersCrudService,
 } from '../../database/crud';
+import { DictionaryCacheService } from '../../database/services';
 import {
   Code,
   Method,
   Operation,
   OperationStatus,
   User,
+  UserCredential,
 } from '../../database/entities';
 import { TwoFaError, TwoFaErrorCode } from '../../errors';
 import { TAG_SYSTEM, TAG_UNAUTHED } from '../../methods/constants';
@@ -77,8 +77,7 @@ export class OperationService {
     private readonly _methodsCrud: MethodsCrudService,
     private readonly _methodTypesCrud: MethodTypesCrudService,
     private readonly _methodTagsCrud: MethodTagsCrudService,
-    private readonly _tagsCrud: TagsCrudService,
-    private readonly _typesCrud: TypesCrudService,
+    private readonly _dictionaryCache: DictionaryCacheService,
     private readonly _usersCrud: UsersCrudService,
     private readonly _credentialsCrud: UserCredentialsCrudService,
     private readonly _operationsCrud: OperationsCrudService,
@@ -125,13 +124,12 @@ export class OperationService {
   ): Promise<SendTwoFaResult> {
     const isRegistration =
       tagNames.includes(TAG_SYSTEM) && tagNames.includes(TAG_UNAUTHED);
-    const coreUserId = actor.authed
-      ? (params.actor.userId as string)
-      : (actor.user?.userId ?? null);
-
-    const effective = await this._effectiveMethods.resolve(coreUserId);
-    const effectiveTypes =
-      effective.find((view) => view.id === method.id)?.types ?? [];
+    // юзер уже загружен в _resolveActor — повторного запроса нет
+    const effectiveTypes = await this._effectiveMethods.resolveMethodTypes(
+      method,
+      tagNames,
+      actor.user,
+    );
 
     // непокрытый метод: authed — честная ошибка (фронт видит покрытие),
     // unauthed — пустышка, иначе sendTwoFa — оракул «юзер отключил 2ФА»
@@ -171,18 +169,16 @@ export class OperationService {
         );
         const events: CodeSendEvent[] = [];
         const views: SendTwoFaTypeView[] = [];
+        const codeRows: Array<Partial<Code>> = [];
         for (const type of prepared) {
           if (type.selfVerified) {
-            await this._codesCrud.create(
-              {
-                operationId: created.id,
-                typeId: type.typeId,
-                codeHash: null,
-                lastSentAt: null,
-                expiresAt,
-              },
-              manager,
-            );
+            codeRows.push({
+              operationId: created.id,
+              typeId: type.typeId,
+              codeHash: null,
+              lastSentAt: null,
+              expiresAt,
+            });
             views.push({
               type: type.typeName,
               identity: null,
@@ -192,18 +188,15 @@ export class OperationService {
             continue;
           }
           const code = this._codeGenerator.generate();
-          await this._codesCrud.create(
-            {
-              operationId: created.id,
-              typeId: type.typeId,
-              codeHash: dummy
-                ? this._codeGenerator.randomHash()
-                : this._codeGenerator.hash(code),
-              lastSentAt: new Date(),
-              expiresAt,
-            },
-            manager,
-          );
+          codeRows.push({
+            operationId: created.id,
+            typeId: type.typeId,
+            codeHash: dummy
+              ? this._codeGenerator.randomHash()
+              : this._codeGenerator.hash(code),
+            lastSentAt: new Date(),
+            expiresAt,
+          });
           if (!dummy && type.destination) {
             events.push(
               this._buildEvent(code, type, created.id, params.locale),
@@ -216,6 +209,7 @@ export class OperationService {
             retry: this._retrySeconds,
           });
         }
+        await this._codesCrud.createMany(codeRows, manager);
         return { operation: created, outbox: events, responseTypes: views };
       });
 
@@ -256,7 +250,7 @@ export class OperationService {
           { operationId: activeOperation.id },
           manager,
         );
-        const typeNameById = await this._typeNameById(manager);
+        const { typeNameById } = await this._dictionaryCache.get();
         const rowByTypeName = new Map(
           codeRows.map((row) => [typeNameById.get(row.typeId) as string, row]),
         );
@@ -368,11 +362,10 @@ export class OperationService {
         `Method "${methodName}" does not exist`,
       );
     }
-    const [tagRows, tags] = await Promise.all([
+    const [tagRows, { tagNameById }] = await Promise.all([
       this._methodTagsCrud.findBy({ methodId: method.id }),
-      this._tagsCrud.findBy({}),
+      this._dictionaryCache.get(),
     ]);
-    const tagNameById = new Map(tags.map((tag) => [tag.id, tag.name]));
     return {
       method,
       tagNames: tagRows.map((row) => tagNameById.get(row.tagId) as string),
@@ -434,11 +427,13 @@ export class OperationService {
     flags: { dummy: boolean; isRegistration: boolean },
     options: { silentMissingCredential?: boolean } = {},
   ): Promise<PreparedType[]> {
-    const types = await this._typesCrud.findBy({
-      isActive: true,
-      isDeleted: false,
-    });
-    const typeByName = new Map(types.map((type) => [type.type, type]));
+    const { activeTypeByName: typeByName } = await this._dictionaryCache.get();
+    const credentialByTypeId = await this._loadCredentialsByTypeId(
+      typeNames,
+      actor,
+      flags,
+      typeByName,
+    );
     const prepared: PreparedType[] = [];
     for (const typeName of typeNames) {
       const type = typeByName.get(typeName);
@@ -460,13 +455,7 @@ export class OperationService {
         if (flags.isRegistration && !actor.user) {
           destination = actor.identity;
         } else if (actor.user) {
-          const [credential] = await this._credentialsCrud.findBy({
-            userId: actor.user.id,
-            typeId: type.id,
-            isConfirmed: true,
-            isActive: true,
-            isDeleted: false,
-          });
+          const credential = credentialByTypeId.get(type.id);
           if (credential) {
             destination = credential.identity;
           } else if (actor.authed && !options.silentMissingCredential) {
@@ -489,6 +478,37 @@ export class OperationService {
     return prepared;
   }
 
+  /** Подтверждённые активные креды юзера по всем нужным типам одним запросом. */
+  private async _loadCredentialsByTypeId(
+    typeNames: string[],
+    actor: ActorContext,
+    flags: { dummy: boolean; isRegistration: boolean },
+    typeByName: Map<string, { id: string }>,
+  ): Promise<Map<string, UserCredential>> {
+    const needsCredentials =
+      !flags.dummy && !(flags.isRegistration && !actor.user) && actor.user;
+    if (!needsCredentials) {
+      return new Map();
+    }
+    const typeIds = typeNames
+      .filter((name) => !this._verifierRegistry.isSelfVerified(name))
+      .map((name) => typeByName.get(name)?.id)
+      .filter((id): id is string => id !== undefined);
+    if (typeIds.length === 0) {
+      return new Map();
+    }
+    const credentials = await this._credentialsCrud.findBy({
+      userId: (actor.user as User).id,
+      typeId: In(typeIds),
+      isConfirmed: true,
+      isActive: true,
+      isDeleted: false,
+    });
+    return new Map(
+      credentials.map((credential) => [credential.typeId, credential]),
+    );
+  }
+
   /**
    * Анти-флуд, два измерения, под advisory lock — параллельные sendTwoFa
    * не проскакивают порог. Пустышки учитываются наравне с настоящими.
@@ -505,7 +525,7 @@ export class OperationService {
       `2fa:${actorKey}:${method.method}`,
     ]);
     const daySince = new Date(Date.now() - DAY_MS);
-    const dayOperations = await this._operationsCrud.findBy(
+    const dayOperations = await this._operationsCrud.countBy(
       actor.authed
         ? {
             userId: (actor.user as User).id,
@@ -519,7 +539,7 @@ export class OperationService {
           },
       manager,
     );
-    if (dayOperations.length >= this._operationsPerDay) {
+    if (dayOperations >= this._operationsPerDay) {
       throw new TwoFaError(TwoFaErrorCode.DailyOperationsLimitExceeded);
     }
     if (!actor.authed && actor.clientIp) {
@@ -527,11 +547,11 @@ export class OperationService {
         `2fa:ip:${actor.clientIp}`,
       ]);
       const hourSince = new Date(Date.now() - HOUR_MS);
-      const hourOperations = await this._operationsCrud.findBy(
+      const hourOperations = await this._operationsCrud.countBy(
         { clientIp: actor.clientIp, createdAt: MoreThanOrEqual(hourSince) },
         manager,
       );
-      if (hourOperations.length >= this._ipHourlyLimit) {
+      if (hourOperations >= this._ipHourlyLimit) {
         throw new TwoFaError(TwoFaErrorCode.IpLimitExceeded);
       }
     }
@@ -597,20 +617,13 @@ export class OperationService {
 
   /** Конфигурация метода без учёта юзера — типы для операции-пустышки. */
   private async _methodConfiguredTypes(methodId: string): Promise<string[]> {
-    const [typeNameById, methodTypes] = await Promise.all([
-      this._typeNameById(),
+    const [{ typeNameById }, methodTypes] = await Promise.all([
+      this._dictionaryCache.get(),
       this._methodTypesCrud.findBy({ methodId }),
     ]);
     return methodTypes
       .map((row) => typeNameById.get(row.typeId))
       .filter((name): name is string => name !== undefined);
-  }
-
-  private async _typeNameById(
-    manager?: EntityManager,
-  ): Promise<Map<string, string>> {
-    const types = await this._typesCrud.findBy({}, manager);
-    return new Map(types.map((type) => [type.id, type.type]));
   }
 
   private _buildEvent(

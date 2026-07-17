@@ -5,9 +5,9 @@ import {
   CodesCrudService,
   MethodsCrudService,
   OperationsCrudService,
-  TypesCrudService,
   UsersCrudService,
 } from '../../database/crud';
+import { DictionaryCacheService } from '../../database/services';
 import { Code, Operation, OperationStatus } from '../../database/entities';
 import { TwoFaError, TwoFaErrorCode } from '../../errors';
 import { VerifyParams, VerifyResult } from '../interfaces';
@@ -30,7 +30,7 @@ export class VerificationService {
     private readonly _usersCrud: UsersCrudService,
     private readonly _operationsCrud: OperationsCrudService,
     private readonly _codesCrud: CodesCrudService,
-    private readonly _typesCrud: TypesCrudService,
+    private readonly _dictionaryCache: DictionaryCacheService,
     private readonly _verifierRegistry: VerifierRegistry,
   ) {
     this._attemptsLimit = config.getOrThrow<number>('codes.attemptsLimit');
@@ -126,9 +126,7 @@ export class VerificationService {
         throw new TwoFaError(TwoFaErrorCode.OperationAlreadyUsed);
       }
       const verifiedAt = new Date();
-      for (const row of rowByTypeName.values()) {
-        await this._codesCrud.update(row.id, { verifiedAt }, manager);
-      }
+      await this._codesCrud.markVerified(operation.id, verifiedAt, manager);
 
       const user = operation.userId
         ? await this._usersCrud.findById(operation.userId, manager)
@@ -158,11 +156,10 @@ export class VerificationService {
     operation: Operation,
     manager: EntityManager,
   ): Promise<Map<string, Code>> {
-    const [rows, types] = await Promise.all([
+    const [rows, { typeNameById }] = await Promise.all([
       this._codesCrud.findBy({ operationId: operation.id }, manager),
-      this._typesCrud.findBy({}, manager),
+      this._dictionaryCache.get(),
     ]);
-    const typeNameById = new Map(types.map((type) => [type.id, type.type]));
     return new Map(
       rows.map((row) => [typeNameById.get(row.typeId) as string, row]),
     );

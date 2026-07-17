@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, FindOptionsWhere, Repository } from 'typeorm';
 import { Operation, OperationStatus } from '../entities';
 import { CrudService } from './crud.service';
 
@@ -13,6 +13,14 @@ import { CrudService } from './crud.service';
 export class OperationsCrudService extends CrudService<Operation> {
   constructor(@InjectRepository(Operation) repository: Repository<Operation>) {
     super(repository);
+  }
+
+  /** COUNT(*) по критериям — для лимитов, где сами строки не нужны. */
+  countBy(
+    criteria: FindOptionsWhere<Operation>,
+    manager?: EntityManager,
+  ): Promise<number> {
+    return this.repo(manager).countBy(criteria);
   }
 
   findByIdForUpdate(

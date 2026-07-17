@@ -10,7 +10,11 @@ import {
 } from '../../src/database/entities';
 import { TwoFaError } from '../../src/errors';
 import { EffectiveMethodsResolverService } from '../../src/methods/services';
-import { FakeCrud, seedDictionaries } from '../testing/fakes';
+import {
+  FakeCrud,
+  fakeDictionaryCache,
+  seedDictionaries,
+} from '../testing/fakes';
 
 const CORE_USER_ID = 'core-user-1';
 
@@ -52,8 +56,7 @@ describe('EffectiveMethodsResolverService.resolve', () => {
       methodTagsCrud as any,
       userMethodsCrud as any,
       userMethodTypesCrud as any,
-      typesCrud as any,
-      tagsCrud as any,
+      fakeDictionaryCache(typesCrud, tagsCrud),
     );
     /* eslint-enable @typescript-eslint/no-explicit-any */
   });
@@ -189,6 +192,61 @@ describe('EffectiveMethodsResolverService.resolve', () => {
     addMethod('withdraw', [], []);
 
     expect(await service.resolve(CORE_USER_ID)).toEqual([]);
+  });
+
+  describe('resolveMethodTypes (узкий резолв одного метода)', () => {
+    it('совпадает с resolve() для user-метода с переопределением', async () => {
+      const transfer = addMethod('transfer', ['sms', 'email'], ['user']);
+      addOverride(transfer, ['email']);
+
+      const types = await service.resolveMethodTypes(
+        transfer,
+        ['user'],
+        CORE_USER_ID,
+      );
+
+      expect(types).toEqual(['email']);
+    });
+
+    it('system: переопределение игнорируется', async () => {
+      const signup = addMethod('signup', ['sms'], ['system', 'unauthed']);
+      addOverride(signup, [], false);
+
+      expect(
+        await service.resolveMethodTypes(
+          signup,
+          ['system', 'unauthed'],
+          CORE_USER_ID,
+        ),
+      ).toEqual(['sms']);
+    });
+
+    it('аноним: метод без unauthed не покрыт', async () => {
+      const transfer = addMethod('transfer', ['sms'], ['user']);
+
+      expect(
+        await service.resolveMethodTypes(transfer, ['user'], null),
+      ).toEqual([]);
+    });
+
+    it('переданный User используется без повторного запроса юзера', async () => {
+      const transfer = addMethod('transfer', ['sms', 'email'], ['user']);
+      addOverride(transfer, ['sms']);
+
+      const types = await service.resolveMethodTypes(transfer, ['user'], user);
+
+      expect(types).toEqual(['sms']);
+      expect(usersCrud.findBy).not.toHaveBeenCalled();
+    });
+
+    it('tagNames = null — теги метода дозагружаются', async () => {
+      const transfer = addMethod('transfer', ['sms'], ['user']);
+      addOverride(transfer, [], false);
+
+      expect(
+        await service.resolveMethodTypes(transfer, null, CORE_USER_ID),
+      ).toEqual([]);
+    });
   });
 
   it('неактивный и удалённый методы не попадают', async () => {

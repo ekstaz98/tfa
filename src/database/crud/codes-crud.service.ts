@@ -10,6 +10,15 @@ export class CodesCrudService extends CrudService<Code> {
     super(repository);
   }
 
+  /** Проставляет verified_at всем кодам операции одним UPDATE. */
+  async markVerified(
+    operationId: string,
+    verifiedAt: Date,
+    manager?: EntityManager,
+  ): Promise<void> {
+    await this.repo(manager).update({ operationId }, { verifiedAt });
+  }
+
   /** Атомарный SET attempts = attempts + 1; возвращает новое значение. */
   async incrementAttempts(
     id: string,

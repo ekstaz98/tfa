@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { DataSource, EntityManager, FindOperator } from 'typeorm';
 import { OperationStatus } from '../../src/database/entities';
+import { DictionaryCacheService } from '../../src/database/services';
 
 interface HasId {
   id: string;
@@ -45,6 +46,10 @@ export class FakeCrud<T extends HasId> {
     return Promise.resolve(this.seed(data));
   });
 
+  createMany = jest.fn((data: Array<Partial<T>>): Promise<T[]> => {
+    return Promise.resolve(data.map((row) => this.seed(row)));
+  });
+
   findById = jest.fn((id: string): Promise<T | null> => {
     return Promise.resolve(this.rows.find((row) => row.id === id) ?? null);
   });
@@ -65,12 +70,23 @@ export class FakeCrud<T extends HasId> {
     return Promise.resolve();
   });
 
+  updateMany = jest.fn(async (ids: string[], data: Partial<T>) => {
+    for (const id of ids) {
+      await this.update(id, data);
+    }
+  });
+
   softDelete = jest.fn((id: string): Promise<void> => {
     return this.update(id, { isDeleted: true } as unknown as Partial<T>);
   });
 
   delete = jest.fn((id: string): Promise<void> => {
     this.rows = this.rows.filter((row) => row.id !== id);
+    return Promise.resolve();
+  });
+
+  deleteMany = jest.fn((ids: string[]): Promise<void> => {
+    this.rows = this.rows.filter((row) => !ids.includes(row.id));
     return Promise.resolve();
   });
 }
@@ -83,6 +99,10 @@ interface HasStatus extends HasId {
 export class FakeOperationsCrud<
   T extends HasStatus = HasStatus,
 > extends FakeCrud<T> {
+  countBy = jest.fn(async (criteria: object): Promise<number> => {
+    return (await this.findBy(criteria)).length;
+  });
+
   findByIdForUpdate = jest.fn((id: string): Promise<T | null> => {
     return this.findById(id);
   });
@@ -112,6 +132,17 @@ interface HasAttempts extends HasId {
 export class FakeCodesCrud<
   T extends HasAttempts = HasAttempts,
 > extends FakeCrud<T> {
+  markVerified = jest.fn(
+    (operationId: string, verifiedAt: Date): Promise<void> => {
+      for (const row of this.rows) {
+        if ((row as Record<string, unknown>).operationId === operationId) {
+          (row as Record<string, unknown>).verifiedAt = verifiedAt;
+        }
+      }
+      return Promise.resolve();
+    },
+  );
+
   incrementAttempts = jest.fn((id: string): Promise<number> => {
     const row = this.rows.find((candidate) => candidate.id === id);
     if (!row) {
@@ -157,6 +188,28 @@ export function fakeConfig(values: Record<string, unknown>): ConfigService {
       return values[path];
     },
   } as unknown as ConfigService;
+}
+
+/**
+ * Реальный кэш справочников поверх фейковых CRUD с TTL 0 —
+ * юниты всегда видят актуальные строки фейков.
+ */
+export function fakeDictionaryCache(
+  typesCrud: FakeCrud<{
+    id: string;
+    type: string;
+    isActive: boolean;
+    isDeleted: boolean;
+  }>,
+  tagsCrud: FakeCrud<{ id: string; name: string; isActive: boolean }>,
+): DictionaryCacheService {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  return new DictionaryCacheService(
+    fakeConfig({ 'dictionaries.cacheTtlSeconds': 0 }),
+    typesCrud as any,
+    tagsCrud as any,
+  );
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 
 /** Справочники из сид-миграции. */

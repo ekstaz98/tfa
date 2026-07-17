@@ -11,7 +11,12 @@ import {
 } from '../../src/database/entities';
 import { TwoFaError } from '../../src/errors';
 import { UserSettingsService } from '../../src/methods/services';
-import { FakeCrud, fakeDataSource, seedDictionaries } from '../testing/fakes';
+import {
+  FakeCrud,
+  fakeDataSource,
+  fakeDictionaryCache,
+  seedDictionaries,
+} from '../testing/fakes';
 
 const CORE_USER_ID = 'core-user-1';
 
@@ -76,8 +81,7 @@ describe('UserSettingsService.updateMyMethods', () => {
       methodsCrud as any,
       methodTypesCrud as any,
       methodTagsCrud as any,
-      typesCrud as any,
-      tagsCrud as any,
+      fakeDictionaryCache(typesCrud, tagsCrud),
     );
     /* eslint-enable @typescript-eslint/no-explicit-any */
   });

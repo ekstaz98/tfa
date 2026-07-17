@@ -4,7 +4,10 @@ import {
   UserCredentialsCrudService,
   UsersCrudService,
 } from '../../database/crud';
-import { EffectiveMethodsResolverService } from '../../methods/services';
+import {
+  EffectiveActor,
+  EffectiveMethodsResolverService,
+} from '../../methods/services';
 import { RequirementParams } from '../interfaces';
 import { IdentityNormalizerService } from './identity.service';
 
@@ -34,8 +37,8 @@ export class TwoFaRequirementService {
       return false;
     }
 
-    let coreUserId: string | null = params.userId ?? null;
-    if (!coreUserId && params.identity) {
+    let actor: EffectiveActor = params.userId ?? null;
+    if (!actor && params.identity) {
       const normalized = this._normalizer.normalize(params.identity);
       const credentials = await this._credentialsCrud.findBy({
         identity: normalized,
@@ -45,12 +48,15 @@ export class TwoFaRequirementService {
         (credential) => credential.isConfirmed && credential.isActive,
       );
       if (confirmed) {
-        const user = await this._usersCrud.findById(confirmed.userId);
-        coreUserId = user?.userId ?? null;
+        actor = await this._usersCrud.findById(confirmed.userId);
       }
     }
 
-    const effective = await this._effectiveMethods.resolve(coreUserId);
-    return effective.some((view) => view.id === method.id);
+    const effectiveTypes = await this._effectiveMethods.resolveMethodTypes(
+      method,
+      null,
+      actor,
+    );
+    return effectiveTypes.length > 0;
   }
 }
