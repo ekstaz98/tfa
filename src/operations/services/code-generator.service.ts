@@ -19,9 +19,11 @@ export class CodeGeneratorService {
   }
 
   generate(): string {
-    return randomInt(0, 10 ** this._length)
+    const code = randomInt(0, 10 ** this._length)
       .toString()
       .padStart(this._length, '0');
+
+    return code;
   }
 
   hash(code: string): string {

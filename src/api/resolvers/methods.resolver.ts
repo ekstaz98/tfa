@@ -15,7 +15,7 @@ import {
   UpdateListMethodsResponse,
   UpdateMethodsInput,
   UpdateMyMethodsInput,
-} from '../dto';
+} from '../dtos';
 // import { AdminGuard, AuthedGuard, ServiceGuard } from '../guards/role.guards';
 import { ReqCtx, dropNulls } from '../helpers';
 import { RequestContext } from '../interfaces';

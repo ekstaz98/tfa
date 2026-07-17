@@ -1,6 +1,6 @@
 import { Query, Resolver } from '@nestjs/graphql';
 import { TypesCrudService } from '../../database/crud';
-import { TwoFaTypeDto } from '../dto';
+import { TwoFaTypeDto } from '../dtos';
 
 @Resolver(() => TwoFaTypeDto)
 export class TypesResolver {

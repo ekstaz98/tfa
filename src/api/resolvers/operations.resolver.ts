@@ -11,7 +11,7 @@ import {
   SendTwoFaResponse,
   VerifyTwoFaInput,
   VerifyTwoFaResponse,
-} from '../dto';
+} from '../dtos';
 // import { ServiceGuard } from '../guards/role.guards';
 import { ReqCtx } from '../helpers';
 import { RequestContext } from '../interfaces';
