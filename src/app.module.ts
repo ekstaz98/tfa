@@ -10,6 +10,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ApiModule } from './api/api.module';
 import { MethodsModule } from './methods/methods.module';
 import { OperationsModule } from './operations/operations.module';
+import { UsersSyncModule } from './users-sync/users-sync.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { OperationsModule } from './operations/operations.module';
     CryptoModule,
     MethodsModule,
     OperationsModule,
+    UsersSyncModule,
     ApiModule,
   ],
 })
