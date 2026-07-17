@@ -22,19 +22,19 @@ interface IntrospectionResponse {
 /** Реализация порта: интроспекция GraphQL-схемы гейтвея. */
 @Injectable()
 export class GatewayIntrospectionService implements GatewayMethodsPort {
-  private readonly url: string | null;
+  private readonly _url: string | null;
 
   constructor(config: ConfigService) {
-    this.url = config.get<string | null>('gateway.graphqlUrl') ?? null;
+    this._url = config.get<string | null>('gateway.graphqlUrl') ?? null;
   }
 
   async fetchMethodNames(): Promise<string[]> {
-    if (!this.url) {
+    if (!this._url) {
       throw new Error(
         'GATEWAY_GRAPHQL_URL is not configured, methods sync is unavailable',
       );
     }
-    const response = await fetch(this.url, {
+    const response = await fetch(this._url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ query: INTROSPECTION_QUERY }),

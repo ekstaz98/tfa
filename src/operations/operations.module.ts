@@ -2,19 +2,19 @@ import { Module } from '@nestjs/common';
 import { CryptoModule } from '../crypto/crypto.module';
 import { DatabaseModule } from '../database/database.module';
 import { MethodsModule } from '../methods/methods.module';
-import { CodeGeneratorService } from './code-generator.service';
+import { CODE_SEND_PUBLISHER } from './interfaces';
 import {
+  CodeGeneratorService,
+  HashCodeVerifier,
   IdentityMaskerService,
   IdentityNormalizerService,
-} from './identity.service';
-import { OperationService } from './operation.service';
-import { CODE_SEND_PUBLISHER } from './ports/code-send-publisher.port';
-import { HashCodeVerifier } from './ports/hash-code.verifier';
-import { MockCodeSendPublisher } from './ports/mock-code-send-publisher';
-import { TotpVerifier } from './ports/totp.verifier';
-import { VerifierRegistry } from './ports/verifier-registry';
-import { RetentionService } from './retention.service';
-import { VerificationService } from './verification.service';
+  MockCodeSendPublisher,
+  OperationService,
+  RetentionService,
+  TotpVerifier,
+  VerificationService,
+  VerifierRegistry,
+} from './services';
 
 @Module({
   imports: [DatabaseModule, CryptoModule, MethodsModule],

@@ -1,5 +1,6 @@
 export interface AppConfig {
   port: number;
+  host: string;
   database: {
     url: string;
   };
@@ -52,6 +53,7 @@ export interface AppConfig {
 
 export default (): AppConfig => ({
   port: Number(process.env.PORT ?? 3000),
+  host: process.env.HOST ?? 'localhost',
   database: {
     url: process.env.DATABASE_URL as string,
   },

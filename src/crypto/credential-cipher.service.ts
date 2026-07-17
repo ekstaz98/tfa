@@ -14,11 +14,11 @@ const SEPARATOR = ':';
  */
 @Injectable()
 export class CredentialCipherService {
-  private readonly keys = new Map<string, Buffer>();
-  private readonly currentVersion: string;
+  private readonly _keys = new Map<string, Buffer>();
+  private readonly _currentVersion: string;
 
   constructor(config: ConfigService) {
-    this.currentVersion = config.getOrThrow<string>(
+    this._currentVersion = config.getOrThrow<string>(
       'totpCipher.currentVersion',
     );
     const keys = config.getOrThrow<Record<string, string>>('totpCipher.keys');
@@ -28,17 +28,17 @@ export class CredentialCipherService {
           `TOTP cipher key version "${version}" must not contain "${SEPARATOR}"`,
         );
       }
-      this.keys.set(version, Buffer.from(hex, 'hex'));
+      this._keys.set(version, Buffer.from(hex, 'hex'));
     }
-    if (!this.keys.has(this.currentVersion)) {
+    if (!this._keys.has(this._currentVersion)) {
       throw new Error(
-        `TOTP cipher current key version "${this.currentVersion}" is missing`,
+        `TOTP cipher current key version "${this._currentVersion}" is missing`,
       );
     }
   }
 
   encrypt(plaintext: string): string {
-    const key = this.keys.get(this.currentVersion) as Buffer;
+    const key = this._keys.get(this._currentVersion) as Buffer;
     const iv = randomBytes(IV_LENGTH);
     const cipher = createCipheriv(ALGORITHM, key, iv);
     const data = Buffer.concat([
@@ -46,7 +46,7 @@ export class CredentialCipherService {
       cipher.final(),
     ]);
     return [
-      this.currentVersion,
+      this._currentVersion,
       iv.toString('base64'),
       cipher.getAuthTag().toString('base64'),
       data.toString('base64'),
@@ -59,7 +59,7 @@ export class CredentialCipherService {
       throw new Error('Malformed credential ciphertext');
     }
     const [version, ivB64, tagB64, dataB64] = parts;
-    const key = this.keys.get(version);
+    const key = this._keys.get(version);
     if (!key) {
       throw new Error(`Unknown credential cipher key version "${version}"`);
     }

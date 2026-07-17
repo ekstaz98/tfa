@@ -27,17 +27,17 @@ interface Dictionaries {
 @Injectable()
 export class MethodsAdminService {
   constructor(
-    private readonly dataSource: DataSource,
-    private readonly methodsCrud: MethodsCrudService,
-    private readonly methodTypesCrud: MethodTypesCrudService,
-    private readonly methodTagsCrud: MethodTagsCrudService,
-    private readonly typesCrud: TypesCrudService,
-    private readonly tagsCrud: TagsCrudService,
-    private readonly methodViews: MethodViewsService,
+    private readonly _dataSource: DataSource,
+    private readonly _methodsCrud: MethodsCrudService,
+    private readonly _methodTypesCrud: MethodTypesCrudService,
+    private readonly _methodTagsCrud: MethodTagsCrudService,
+    private readonly _typesCrud: TypesCrudService,
+    private readonly _tagsCrud: TagsCrudService,
+    private readonly _methodViews: MethodViewsService,
   ) {}
 
   async createMethods(inputs: CreateMethodInput[]): Promise<MethodView[]> {
-    const dictionaries = await this.loadDictionaries();
+    const dictionaries = await this._loadDictionaries();
 
     const seen = new Set<string>();
     for (const input of inputs) {
@@ -48,11 +48,11 @@ export class MethodsAdminService {
         );
       }
       seen.add(input.method);
-      this.resolveTagIds(input.tags, dictionaries);
-      this.resolveTypeIds(input.types, dictionaries);
+      this._resolveTagIds(input.tags, dictionaries);
+      this._resolveTypeIds(input.types, dictionaries);
     }
 
-    const duplicates = await this.methodsCrud.findBy({
+    const duplicates = await this._methodsCrud.findBy({
       method: In(inputs.map((input) => input.method)),
       isDeleted: false,
     });
@@ -63,45 +63,45 @@ export class MethodsAdminService {
       );
     }
 
-    const created = await this.dataSource.transaction(async (manager) => {
+    const created = await this._dataSource.transaction(async (manager) => {
       const methods: Method[] = [];
       for (const input of inputs) {
-        const method = await this.methodsCrud.create(
+        const method = await this._methodsCrud.create(
           { method: input.method, isActive: input.isActive ?? true },
           manager,
         );
-        await this.replaceLinks(
+        await this._replaceLinks(
           method.id,
-          this.resolveTypeIds(input.types, dictionaries),
-          this.resolveTagIds(input.tags, dictionaries),
+          this._resolveTypeIds(input.types, dictionaries),
+          this._resolveTagIds(input.tags, dictionaries),
           manager,
         );
         methods.push(method);
       }
       return methods;
     });
-    return this.methodViews.buildViews(created);
+    return this._methodViews.buildViews(created);
   }
 
   async updateMethods(inputs: UpdateMethodInput[]): Promise<MethodView[]> {
-    const dictionaries = await this.loadDictionaries();
+    const dictionaries = await this._loadDictionaries();
 
-    const updated = await this.dataSource.transaction(async (manager) => {
+    const updated = await this._dataSource.transaction(async (manager) => {
       const methods: Method[] = [];
       for (const input of inputs) {
-        methods.push(await this.updateOne(input, dictionaries, manager));
+        methods.push(await this._updateOne(input, dictionaries, manager));
       }
       return methods;
     });
-    return this.methodViews.buildViews(updated);
+    return this._methodViews.buildViews(updated);
   }
 
-  private async updateOne(
+  private async _updateOne(
     input: UpdateMethodInput,
     dictionaries: Dictionaries,
     manager: EntityManager,
   ): Promise<Method> {
-    const method = await this.methodsCrud.findById(input.id, manager);
+    const method = await this._methodsCrud.findById(input.id, manager);
     if (!method) {
       throw new TwoFaError(
         TwoFaErrorCode.UnknownMethod,
@@ -111,7 +111,7 @@ export class MethodsAdminService {
 
     // guard системных методов: пока висит тег system — метод не выключить,
     // не удалить и не лишить типов; снятие тега — отдельное действие.
-    const currentTagRows = await this.methodTagsCrud.findBy(
+    const currentTagRows = await this._methodTagsCrud.findBy(
       { methodId: method.id },
       manager,
     );
@@ -133,7 +133,7 @@ export class MethodsAdminService {
       input.isDeleted === false ||
       (!method.isDeleted && input.isDeleted !== true);
     if (becomesVisible && (input.method || input.isDeleted === false)) {
-      const duplicates = await this.methodsCrud.findBy(
+      const duplicates = await this._methodsCrud.findBy(
         { method: targetName, isDeleted: false },
         manager,
       );
@@ -146,13 +146,13 @@ export class MethodsAdminService {
     }
 
     const typeIds = input.types
-      ? this.resolveTypeIds(input.types, dictionaries)
+      ? this._resolveTypeIds(input.types, dictionaries)
       : undefined;
     const tagIds = input.tags
-      ? this.resolveTagIds(input.tags, dictionaries)
+      ? this._resolveTagIds(input.tags, dictionaries)
       : undefined;
 
-    await this.methodsCrud.update(
+    await this._methodsCrud.update(
       method.id,
       {
         ...(input.method !== undefined ? { method: input.method } : {}),
@@ -165,8 +165,8 @@ export class MethodsAdminService {
     );
 
     if (typeIds) {
-      await this.diffLinks(
-        this.methodTypesCrud,
+      await this._diffLinks(
+        this._methodTypesCrud,
         method.id,
         'typeId',
         typeIds,
@@ -174,8 +174,8 @@ export class MethodsAdminService {
       );
     }
     if (tagIds) {
-      await this.diffLinks(
-        this.methodTagsCrud,
+      await this._diffLinks(
+        this._methodTagsCrud,
         method.id,
         'tagId',
         tagIds,
@@ -183,13 +183,13 @@ export class MethodsAdminService {
       );
     }
 
-    return (await this.methodsCrud.findById(method.id, manager)) as Method;
+    return (await this._methodsCrud.findById(method.id, manager)) as Method;
   }
 
-  private async loadDictionaries(): Promise<Dictionaries> {
+  private async _loadDictionaries(): Promise<Dictionaries> {
     const [types, tags] = await Promise.all([
-      this.typesCrud.findBy({ isActive: true, isDeleted: false }),
-      this.tagsCrud.findBy({ isActive: true }),
+      this._typesCrud.findBy({ isActive: true, isDeleted: false }),
+      this._tagsCrud.findBy({ isActive: true }),
     ]);
     return {
       typeIdByName: new Map(types.map((type) => [type.type, type.id])),
@@ -198,7 +198,7 @@ export class MethodsAdminService {
     };
   }
 
-  private resolveTypeIds(
+  private _resolveTypeIds(
     names: string[],
     dictionaries: Dictionaries,
   ): string[] {
@@ -214,7 +214,10 @@ export class MethodsAdminService {
     });
   }
 
-  private resolveTagIds(names: string[], dictionaries: Dictionaries): string[] {
+  private _resolveTagIds(
+    names: string[],
+    dictionaries: Dictionaries,
+  ): string[] {
     const unique = [...new Set(names)];
     const modeTags = unique.filter((name) => MODE_TAGS.includes(name));
     if (modeTags.length > 1) {
@@ -235,22 +238,22 @@ export class MethodsAdminService {
     });
   }
 
-  private async replaceLinks(
+  private async _replaceLinks(
     methodId: string,
     typeIds: string[],
     tagIds: string[],
     manager: EntityManager,
   ): Promise<void> {
     for (const typeId of typeIds) {
-      await this.methodTypesCrud.create({ methodId, typeId }, manager);
+      await this._methodTypesCrud.create({ methodId, typeId }, manager);
     }
     for (const tagId of tagIds) {
-      await this.methodTagsCrud.create({ methodId, tagId }, manager);
+      await this._methodTagsCrud.create({ methodId, tagId }, manager);
     }
   }
 
   /** Связи меняются диффом: лишние строки удаляются, недостающие создаются. */
-  private async diffLinks(
+  private async _diffLinks(
     crud: MethodTypesCrudService | MethodTagsCrudService,
     methodId: string,
     fkField: 'typeId' | 'tagId',

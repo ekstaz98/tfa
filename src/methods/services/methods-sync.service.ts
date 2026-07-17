@@ -1,12 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { MethodsCrudService } from '../../database/crud';
-import { GATEWAY_METHODS_PORT, GatewayMethodsPort } from '../interfaces';
-
-export interface MethodsSyncResult {
-  created: string[];
-  deactivated: string[];
-}
+import {
+  GATEWAY_METHODS_PORT,
+  GatewayMethodsPort,
+  MethodsSyncResult,
+} from '../interfaces';
 
 /**
  * updateListMethods (service-роль): автосинк методов из схемы гейтвея.
@@ -20,22 +19,22 @@ export interface MethodsSyncResult {
 export class MethodsSyncService {
   constructor(
     @Inject(GATEWAY_METHODS_PORT)
-    private readonly gateway: GatewayMethodsPort,
-    private readonly dataSource: DataSource,
-    private readonly methodsCrud: MethodsCrudService,
+    private readonly _gateway: GatewayMethodsPort,
+    private readonly _dataSource: DataSource,
+    private readonly _methodsCrud: MethodsCrudService,
   ) {}
 
   async updateListMethods(): Promise<MethodsSyncResult> {
-    const gatewayNames = new Set(await this.gateway.fetchMethodNames());
-    const existing = await this.methodsCrud.findBy({ isDeleted: false });
+    const gatewayNames = new Set(await this._gateway.fetchMethodNames());
+    const existing = await this._methodsCrud.findBy({ isDeleted: false });
     const knownNames = new Set(existing.map((method) => method.method));
 
     const created: string[] = [];
     const deactivated: string[] = [];
-    await this.dataSource.transaction(async (manager) => {
+    await this._dataSource.transaction(async (manager) => {
       for (const method of existing) {
         if (!gatewayNames.has(method.method) && method.isActive) {
-          await this.methodsCrud.update(
+          await this._methodsCrud.update(
             method.id,
             { isActive: false },
             manager,
@@ -45,7 +44,7 @@ export class MethodsSyncService {
       }
       for (const name of gatewayNames) {
         if (!knownNames.has(name)) {
-          await this.methodsCrud.create(
+          await this._methodsCrud.create(
             { method: name, isActive: true },
             manager,
           );

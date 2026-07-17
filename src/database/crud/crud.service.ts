@@ -17,12 +17,12 @@ interface HasId extends ObjectLiteral {
  * может выполнить несколько CRUD-вызовов в одной транзакции.
  */
 export abstract class CrudService<T extends HasId> {
-  protected constructor(private readonly repository: Repository<T>) {}
+  protected constructor(private readonly _repository: Repository<T>) {}
 
   protected repo(manager?: EntityManager): Repository<T> {
     return manager
-      ? manager.getRepository<T>(this.repository.target)
-      : this.repository;
+      ? manager.getRepository<T>(this._repository.target)
+      : this._repository;
   }
 
   create(data: DeepPartial<T>, manager?: EntityManager): Promise<T> {

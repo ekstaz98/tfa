@@ -25,21 +25,21 @@ import { MethodView } from '../interfaces';
 @Injectable()
 export class EffectiveMethodsResolverService {
   constructor(
-    private readonly usersCrud: UsersCrudService,
-    private readonly methodsCrud: MethodsCrudService,
-    private readonly methodTypesCrud: MethodTypesCrudService,
-    private readonly methodTagsCrud: MethodTagsCrudService,
-    private readonly userMethodsCrud: UserMethodsCrudService,
-    private readonly userMethodTypesCrud: UserMethodTypesCrudService,
-    private readonly typesCrud: TypesCrudService,
-    private readonly tagsCrud: TagsCrudService,
+    private readonly _usersCrud: UsersCrudService,
+    private readonly _methodsCrud: MethodsCrudService,
+    private readonly _methodTypesCrud: MethodTypesCrudService,
+    private readonly _methodTagsCrud: MethodTagsCrudService,
+    private readonly _userMethodsCrud: UserMethodsCrudService,
+    private readonly _userMethodTypesCrud: UserMethodTypesCrudService,
+    private readonly _typesCrud: TypesCrudService,
+    private readonly _tagsCrud: TagsCrudService,
   ) {}
 
   async resolve(
     coreUserId: string | null,
     filterTags: string[] = [],
   ): Promise<MethodView[]> {
-    const tags = await this.tagsCrud.findBy({});
+    const tags = await this._tagsCrud.findBy({});
     const tagNameById = new Map(tags.map((tag) => [tag.id, tag.name]));
     const knownTagNames = new Set(tags.map((tag) => tag.name));
     for (const name of filterTags) {
@@ -51,7 +51,7 @@ export class EffectiveMethodsResolverService {
       }
     }
 
-    const methods = await this.methodsCrud.findBy({
+    const methods = await this._methodsCrud.findBy({
       isActive: true,
       isDeleted: false,
     });
@@ -60,13 +60,13 @@ export class EffectiveMethodsResolverService {
     }
     const methodIds = methods.map((method) => method.id);
     const [methodTypeRows, methodTagRows, types] = await Promise.all([
-      this.methodTypesCrud.findBy({ methodId: In(methodIds) }),
-      this.methodTagsCrud.findBy({ methodId: In(methodIds) }),
-      this.typesCrud.findBy({ isActive: true, isDeleted: false }),
+      this._methodTypesCrud.findBy({ methodId: In(methodIds) }),
+      this._methodTagsCrud.findBy({ methodId: In(methodIds) }),
+      this._typesCrud.findBy({ isActive: true, isDeleted: false }),
     ]);
     const typeNameById = new Map(types.map((type) => [type.id, type.type]));
 
-    const overrides = await this.loadOverrides(coreUserId);
+    const overrides = await this._loadOverrides(coreUserId);
 
     const views: MethodView[] = [];
     for (const method of methods) {
@@ -113,26 +113,26 @@ export class EffectiveMethodsResolverService {
     return views;
   }
 
-  private async loadOverrides(coreUserId: string | null): Promise<{
+  private async _loadOverrides(coreUserId: string | null): Promise<{
     byMethodId: Map<string, { id: string; isActive: boolean }>;
     typeIdsByUserMethodId: Map<string, string[]>;
   } | null> {
     if (coreUserId === null) {
       return null;
     }
-    const [user] = await this.usersCrud.findBy({ userId: coreUserId });
+    const [user] = await this._usersCrud.findBy({ userId: coreUserId });
     if (!user) {
       // юзер ещё не синхронизирован — переопределений нет, действует конфигурация методов
       return null;
     }
-    const userMethods = await this.userMethodsCrud.findBy({
+    const userMethods = await this._userMethodsCrud.findBy({
       userId: user.id,
       isDeleted: false,
     });
     if (userMethods.length === 0) {
       return { byMethodId: new Map(), typeIdsByUserMethodId: new Map() };
     }
-    const typeRows = await this.userMethodTypesCrud.findBy({
+    const typeRows = await this._userMethodTypesCrud.findBy({
       userMethodId: In(userMethods.map((userMethod) => userMethod.id)),
     });
     const typeIdsByUserMethodId = new Map<string, string[]>();

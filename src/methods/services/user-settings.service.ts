@@ -27,23 +27,23 @@ import { MethodView, UpdateMyMethodInput } from '../interfaces';
 @Injectable()
 export class UserSettingsService {
   constructor(
-    private readonly dataSource: DataSource,
-    private readonly usersCrud: UsersCrudService,
-    private readonly userCredentialsCrud: UserCredentialsCrudService,
-    private readonly userMethodsCrud: UserMethodsCrudService,
-    private readonly userMethodTypesCrud: UserMethodTypesCrudService,
-    private readonly methodsCrud: MethodsCrudService,
-    private readonly methodTypesCrud: MethodTypesCrudService,
-    private readonly methodTagsCrud: MethodTagsCrudService,
-    private readonly typesCrud: TypesCrudService,
-    private readonly tagsCrud: TagsCrudService,
+    private readonly _dataSource: DataSource,
+    private readonly _usersCrud: UsersCrudService,
+    private readonly _userCredentialsCrud: UserCredentialsCrudService,
+    private readonly _userMethodsCrud: UserMethodsCrudService,
+    private readonly _userMethodTypesCrud: UserMethodTypesCrudService,
+    private readonly _methodsCrud: MethodsCrudService,
+    private readonly _methodTypesCrud: MethodTypesCrudService,
+    private readonly _methodTagsCrud: MethodTagsCrudService,
+    private readonly _typesCrud: TypesCrudService,
+    private readonly _tagsCrud: TagsCrudService,
   ) {}
 
   async updateMyMethods(
     coreUserId: string,
     inputs: UpdateMyMethodInput[],
   ): Promise<MethodView[]> {
-    const [user] = await this.usersCrud.findBy({ userId: coreUserId });
+    const [user] = await this._usersCrud.findBy({ userId: coreUserId });
     if (!user) {
       throw new TwoFaError(
         TwoFaErrorCode.IdentityNotFound,
@@ -51,18 +51,18 @@ export class UserSettingsService {
       );
     }
     const [types, tags] = await Promise.all([
-      this.typesCrud.findBy({ isActive: true, isDeleted: false }),
-      this.tagsCrud.findBy({}),
+      this._typesCrud.findBy({ isActive: true, isDeleted: false }),
+      this._tagsCrud.findBy({}),
     ]);
     const typeByName = new Map(types.map((type) => [type.type, type]));
     const typeNameById = new Map(types.map((type) => [type.id, type.type]));
     const tagNameById = new Map(tags.map((tag) => [tag.id, tag.name]));
 
-    return this.dataSource.transaction(async (manager) => {
+    return this._dataSource.transaction(async (manager) => {
       const views: MethodView[] = [];
       for (const input of inputs) {
         views.push(
-          await this.updateOne(user, input, {
+          await this._updateOne(user, input, {
             manager,
             typeByName,
             typeNameById,
@@ -74,7 +74,7 @@ export class UserSettingsService {
     });
   }
 
-  private async updateOne(
+  private async _updateOne(
     user: User,
     input: UpdateMyMethodInput,
     context: {
@@ -85,7 +85,7 @@ export class UserSettingsService {
     },
   ): Promise<MethodView> {
     const { manager } = context;
-    const method = await this.methodsCrud.findById(input.id, manager);
+    const method = await this._methodsCrud.findById(input.id, manager);
     if (!method || method.isDeleted) {
       throw new TwoFaError(
         TwoFaErrorCode.UnknownMethod,
@@ -94,7 +94,7 @@ export class UserSettingsService {
     }
 
     const methodTagNames = (
-      await this.methodTagsCrud.findBy({ methodId: method.id }, manager)
+      await this._methodTagsCrud.findBy({ methodId: method.id }, manager)
     ).map((row) => context.tagNameById.get(row.tagId) as string);
     if (!methodTagNames.includes(TAG_USER)) {
       throw new TwoFaError(
@@ -104,9 +104,9 @@ export class UserSettingsService {
     }
 
     const allowedTypeIds = new Set(
-      (await this.methodTypesCrud.findBy({ methodId: method.id }, manager)).map(
-        (row) => row.typeId,
-      ),
+      (
+        await this._methodTypesCrud.findBy({ methodId: method.id }, manager)
+      ).map((row) => row.typeId),
     );
 
     let typeIds: string[] | undefined;
@@ -121,20 +121,20 @@ export class UserSettingsService {
         }
         return type.id;
       });
-      await this.assertConfirmedCredentials(user, typeIds, context);
+      await this._assertConfirmedCredentials(user, typeIds, context);
     }
 
-    const userMethod = await this.upsertUserMethod(
+    const userMethod = await this._upsertUserMethod(
       user,
       method,
       input,
       manager,
     );
     if (typeIds) {
-      await this.diffUserMethodTypes(userMethod.id, typeIds, manager);
+      await this._diffUserMethodTypes(userMethod.id, typeIds, manager);
     }
 
-    const currentTypeRows = await this.userMethodTypesCrud.findBy(
+    const currentTypeRows = await this._userMethodTypesCrud.findBy(
       { userMethodId: userMethod.id },
       manager,
     );
@@ -151,7 +151,7 @@ export class UserSettingsService {
   }
 
   /** Юзер не может выбрать канал, которым не владеет: кред подтверждён и активен, для TOTP — с секретом. */
-  private async assertConfirmedCredentials(
+  private async _assertConfirmedCredentials(
     user: User,
     typeIds: string[],
     context: {
@@ -161,7 +161,7 @@ export class UserSettingsService {
   ): Promise<void> {
     for (const typeId of typeIds) {
       const typeName = context.typeNameById.get(typeId) as string;
-      const [credential] = await this.userCredentialsCrud.findBy(
+      const [credential] = await this._userCredentialsCrud.findBy(
         {
           userId: user.id,
           typeId,
@@ -180,18 +180,18 @@ export class UserSettingsService {
     }
   }
 
-  private async upsertUserMethod(
+  private async _upsertUserMethod(
     user: User,
     method: Method,
     input: UpdateMyMethodInput,
     manager: EntityManager,
   ): Promise<UserMethod> {
-    const [existing] = await this.userMethodsCrud.findBy(
+    const [existing] = await this._userMethodsCrud.findBy(
       { userId: user.id, methodId: method.id, isDeleted: false },
       manager,
     );
     if (!existing) {
-      return this.userMethodsCrud.create(
+      return this._userMethodsCrud.create(
         {
           userId: user.id,
           methodId: method.id,
@@ -201,7 +201,7 @@ export class UserSettingsService {
       );
     }
     if (input.isActive !== undefined && input.isActive !== existing.isActive) {
-      await this.userMethodsCrud.update(
+      await this._userMethodsCrud.update(
         existing.id,
         { isActive: input.isActive },
         manager,
@@ -211,12 +211,12 @@ export class UserSettingsService {
     return existing;
   }
 
-  private async diffUserMethodTypes(
+  private async _diffUserMethodTypes(
     userMethodId: string,
     targetTypeIds: string[],
     manager: EntityManager,
   ): Promise<void> {
-    const current = await this.userMethodTypesCrud.findBy(
+    const current = await this._userMethodTypesCrud.findBy(
       { userMethodId },
       manager,
     );
@@ -224,14 +224,14 @@ export class UserSettingsService {
     const existing = new Set<string>();
     for (const row of current) {
       if (!target.has(row.typeId)) {
-        await this.userMethodTypesCrud.delete(row.id, manager);
+        await this._userMethodTypesCrud.delete(row.id, manager);
       } else {
         existing.add(row.typeId);
       }
     }
     for (const typeId of target) {
       if (!existing.has(typeId)) {
-        await this.userMethodTypesCrud.create(
+        await this._userMethodTypesCrud.create(
           { userMethodId, typeId },
           manager,
         );

@@ -13,10 +13,10 @@ import { MethodView } from '../interfaces';
 @Injectable()
 export class MethodViewsService {
   constructor(
-    private readonly methodTypesCrud: MethodTypesCrudService,
-    private readonly methodTagsCrud: MethodTagsCrudService,
-    private readonly typesCrud: TypesCrudService,
-    private readonly tagsCrud: TagsCrudService,
+    private readonly _methodTypesCrud: MethodTypesCrudService,
+    private readonly _methodTagsCrud: MethodTagsCrudService,
+    private readonly _typesCrud: TypesCrudService,
+    private readonly _tagsCrud: TagsCrudService,
   ) {}
 
   async buildViews(
@@ -28,10 +28,10 @@ export class MethodViewsService {
     }
     const methodIds = methods.map((method) => method.id);
     const [typeRows, tagRows, types, tags] = await Promise.all([
-      this.methodTypesCrud.findBy({ methodId: In(methodIds) }, manager),
-      this.methodTagsCrud.findBy({ methodId: In(methodIds) }, manager),
-      this.typesCrud.findBy({}, manager),
-      this.tagsCrud.findBy({}, manager),
+      this._methodTypesCrud.findBy({ methodId: In(methodIds) }, manager),
+      this._methodTagsCrud.findBy({ methodId: In(methodIds) }, manager),
+      this._typesCrud.findBy({}, manager),
+      this._tagsCrud.findBy({}, manager),
     ]);
     const typeNameById = new Map(types.map((type) => [type.id, type.type]));
     const tagNameById = new Map(tags.map((tag) => [tag.id, tag.name]));
