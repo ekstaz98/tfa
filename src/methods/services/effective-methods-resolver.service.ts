@@ -11,7 +11,7 @@ import {
 import { DictionaryCacheService } from '../../database/services';
 import { Method, User } from '../../database/entities';
 import { TwoFaError, TwoFaErrorCode } from '../../errors';
-import { TAG_UNAUTHED, TAG_USER } from './../constants';
+import { TAG_SYSTEM, TAG_UNAUTHED, TAG_USER } from './../constants';
 import { MethodView } from '../interfaces';
 
 /** Актор для резолва: загруженный юзер, core userId или null (аноним). */
@@ -20,8 +20,10 @@ export type EffectiveActor = User | string | null;
 /**
  * Резолв эффективных требований 2ФА для (userId | null, tags[]).
  * Режимные теги: system — user_methods игнорируются, 2ФА для всех;
- * default (или метод без режимного тега) — конфигурация метода для всех;
- * user — запись в user_methods = переопределение юзера.
+ * default (или метод без режимного тега) — конфигурация метода, но все
+ * такие методы разом гасятся общим переключателем юзера
+ * users.default_methods_enabled; user — запись в user_methods =
+ * индивидуальное переопределение юзера.
  * unauthed — ортогональный модификатор: userId = null видит только их.
  * Методы с 0 эффективных типов в требования не попадают.
  */
@@ -88,16 +90,23 @@ export class EffectiveMethodsResolverService {
         .map((row) => typeNameById.get(row.typeId))
         .filter((name): name is string => name !== undefined);
 
-      // переопределение действует только в режиме user
-      if (tagNames.includes(TAG_USER) && overrides) {
-        const override = overrides.byMethodId.get(method.id);
-        if (override) {
+      // user — индивидуальное переопределение; default/без режимного тега —
+      // общий переключатель юзера; system не гасится ничем
+      if (tagNames.includes(TAG_USER)) {
+        const override = overrides?.byMethodId.get(method.id);
+        if (overrides && override) {
           typeNames = this._applyOverride(
             override.isActive,
             overrides.typeIdsByUserMethodId.get(override.id) ?? [],
             typeNameById,
           );
         }
+      } else if (
+        !tagNames.includes(TAG_SYSTEM) &&
+        overrides &&
+        !overrides.user.defaultMethodsEnabled
+      ) {
+        typeNames = [];
       }
 
       if (typeNames.length === 0) {
@@ -167,6 +176,12 @@ export class EffectiveMethodsResolverService {
           );
         }
       }
+    } else if (!methodTagNames.includes(TAG_SYSTEM)) {
+      // default/без режимного тега: общий переключатель юзера
+      const user = await this._resolveUser(actor);
+      if (user && !user.defaultMethodsEnabled) {
+        return [];
+      }
     }
     return typeNames;
   }
@@ -195,6 +210,7 @@ export class EffectiveMethodsResolverService {
   }
 
   private async _loadOverrides(coreUserId: string | null): Promise<{
+    user: User;
     byMethodId: Map<string, { id: string; isActive: boolean }>;
     typeIdsByUserMethodId: Map<string, string[]>;
   } | null> {
@@ -211,7 +227,7 @@ export class EffectiveMethodsResolverService {
       isDeleted: false,
     });
     if (userMethods.length === 0) {
-      return { byMethodId: new Map(), typeIdsByUserMethodId: new Map() };
+      return { user, byMethodId: new Map(), typeIdsByUserMethodId: new Map() };
     }
     const typeRows = await this._userMethodTypesCrud.findBy({
       userMethodId: In(userMethods.map((userMethod) => userMethod.id)),
@@ -223,6 +239,7 @@ export class EffectiveMethodsResolverService {
       typeIdsByUserMethodId.set(row.userMethodId, list);
     }
     return {
+      user,
       byMethodId: new Map(
         userMethods.map((userMethod) => [
           userMethod.methodId,

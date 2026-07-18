@@ -73,12 +73,24 @@ export class TwoFaMethodsResponse {
   methods?: TwoFaMethodDto[] | null;
 }
 
-/** Элемент ответа myTwoFaMethods — настройки 2ФА юзера по user-методу. */
+/** Чем управляется метод на экране настроек юзера. */
+export enum TwoFaManagedBy {
+  METHOD = 'method',
+  GLOBAL = 'global',
+}
+registerEnumType(TwoFaManagedBy, {
+  name: 'TwoFaManagedBy',
+  description:
+    'METHOD — индивидуальный выключатель (updateMyTwoFaMethod, тег user); ' +
+    'GLOBAL — общий переключатель default-методов (updateMyTwoFaDefaults).',
+});
+
+/** Элемент ответа myTwoFaMethods — настройки 2ФА юзера по user/default-методу. */
 @ObjectType('MyTwoFaMethod', {
   description:
-    'Настройки 2ФА юзера по методу с тегом user. В отличие от twoFaMethods, ' +
-    'выключенные методы остаются в списке — экран настроек видит их id и ' +
-    'полный набор доступных типов.',
+    'Настройки 2ФА юзера по методу с тегом user или default. В отличие от ' +
+    'twoFaMethods, выключенные методы остаются в списке — экран настроек ' +
+    'видит их id и полный набор доступных типов.',
 })
 export class MyTwoFaMethodDto {
   @Field(() => ID, { description: 'id метода (methods.id)' })
@@ -88,7 +100,7 @@ export class MyTwoFaMethodDto {
   method: string;
 
   @Field({
-    description: 'Требует ли метод 2ФА для юзера с учётом его переопределения',
+    description: 'Требует ли метод 2ФА для юзера с учётом его настроек',
   })
   isEnabled: boolean;
 
@@ -104,6 +116,31 @@ export class MyTwoFaMethodDto {
 
   @Field(() => [String], { description: 'Теги метода' })
   tags: string[];
+
+  @Field(() => TwoFaManagedBy, {
+    description:
+      'METHOD — переключается updateMyTwoFaMethod; GLOBAL — общим ' +
+      'переключателем updateMyTwoFaDefaults',
+  })
+  managedBy: 'method' | 'global';
+}
+
+@ObjectType('MyTwoFaSettings', {
+  description: 'Настройки 2ФА юзера уровня аккаунта.',
+})
+export class MyTwoFaSettingsDto {
+  @Field({
+    description:
+      'Общий переключатель: false гасит 2ФА на всех default-методах разом; ' +
+      'user- и system-методы не затрагивает',
+  })
+  defaultMethodsEnabled: boolean;
+}
+
+@InputType()
+export class UpdateMyTwoFaDefaultsInput {
+  @Field({ description: 'Включить (true) или выключить (false) default-2ФА' })
+  isEnabled: boolean;
 }
 
 @InputType()

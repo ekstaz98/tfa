@@ -542,4 +542,112 @@ describe('2FA API (e2e)', () => {
       ).toContain('signin');
     });
   });
+
+  describe('общий переключатель default-методов', () => {
+    const UPDATE_DEFAULTS = `mutation($input: UpdateMyTwoFaDefaultsInput!) {
+      updateMyTwoFaDefaults(input: $input) { defaultMethodsEnabled }
+    }`;
+
+    it('админ создаёт default-метод withdraw — юзер видит его как GLOBAL', async () => {
+      const created = await gql(
+        CREATE_METHODS,
+        {
+          input: {
+            methods: [
+              { method: 'withdraw', types: ['SMS'], tags: ['DEFAULT'] },
+            ],
+          },
+        },
+        ADMIN,
+      );
+      expect(created.errors).toBeUndefined();
+      methodIds.withdraw = (
+        created.data!.createTwoFaMethod as Array<{ id: string }>
+      )[0].id;
+
+      const settings = await gql(
+        `{ myTwoFaSettings { defaultMethodsEnabled } }`,
+        undefined,
+        AUTHED,
+      );
+      expect(settings.data!.myTwoFaSettings.defaultMethodsEnabled).toBe(true);
+
+      const mine = await gql(
+        `{ myTwoFaMethods { method isEnabled managedBy enabledTypes } }`,
+        undefined,
+        AUTHED,
+      );
+      expect(
+        (mine.data!.myTwoFaMethods as Array<{ method: string }>).find(
+          (view) => view.method === 'withdraw',
+        ),
+      ).toEqual({
+        method: 'withdraw',
+        isEnabled: true,
+        managedBy: 'GLOBAL',
+        enabledTypes: ['sms'],
+      });
+    });
+
+    it('default-метод нельзя редактировать индивидуально', async () => {
+      const body = await gql(
+        `mutation($input: UpdateMyMethodsInput!) {
+          updateMyTwoFaMethod(input: $input) { id }
+        }`,
+        { input: { methods: [{ id: methodIds.withdraw, isActive: false }] } },
+        AUTHED,
+      );
+      expect(body.errors![0].code).toBe('METHOD_NOT_CONFIGURABLE-017');
+    });
+
+    it('выключение рубильника гасит withdraw; user/system-методы не тронуты', async () => {
+      const off = await gql(
+        UPDATE_DEFAULTS,
+        { input: { isEnabled: false } },
+        AUTHED,
+      );
+      expect(off.data!.updateMyTwoFaDefaults.defaultMethodsEnabled).toBe(false);
+
+      const required = await gql(
+        VERIFY_TWO_FA,
+        { input: { method: 'withdraw', userId: USER_ID } },
+        SERVICE,
+      );
+      expect(required.data!.verifyTwoFa.required).toBe(false);
+
+      const effective = await gql(
+        `{ twoFaMethods { methods { method } } }`,
+        undefined,
+        AUTHED,
+      );
+      const names = (
+        effective.data!.twoFaMethods.methods as Array<{ method: string }>
+      ).map((view) => view.method);
+      expect(names).not.toContain('withdraw');
+      expect(names).toContain('transfer');
+
+      // в настройках метод остался — с выключенным состоянием
+      const mine = await gql(
+        `{ myTwoFaMethods { method isEnabled } }`,
+        undefined,
+        AUTHED,
+      );
+      expect(
+        (mine.data!.myTwoFaMethods as Array<{ method: string }>).find(
+          (view) => view.method === 'withdraw',
+        ),
+      ).toMatchObject({ isEnabled: false });
+    });
+
+    it('включение обратно возвращает требование 2ФА', async () => {
+      await gql(UPDATE_DEFAULTS, { input: { isEnabled: true } }, AUTHED);
+
+      const required = await gql(
+        VERIFY_TWO_FA,
+        { input: { method: 'withdraw', userId: USER_ID } },
+        SERVICE,
+      );
+      expect(required.data!.verifyTwoFa.required).toBe(true);
+    });
+  });
 });

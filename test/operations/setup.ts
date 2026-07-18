@@ -121,7 +121,7 @@ export function buildTestBed(): OperationsTestBed {
     methodTags: new FakeCrud<MethodTag>(),
     tags: new FakeCrud<Tag>(),
     types: new FakeCrud<Type>(),
-    users: new FakeCrud<User>(),
+    users: new FakeCrud<User>({ defaultMethodsEnabled: true } as Partial<User>),
     credentials: new FakeCrud<UserCredential>(),
     userMethods: new FakeCrud<UserMethod>({
       isActive: true,

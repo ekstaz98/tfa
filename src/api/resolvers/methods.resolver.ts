@@ -10,12 +10,14 @@ import {
 import {
   CreateMethodsInput,
   MyTwoFaMethodDto,
+  MyTwoFaSettingsDto,
   TwoFaMethodDto,
   TwoFaMethodsInput,
   TwoFaMethodsResponse,
   UpdateListMethodsResponse,
   UpdateMethodsInput,
   UpdateMyMethodsInput,
+  UpdateMyTwoFaDefaultsInput,
 } from '../dtos';
 // import { AdminGuard, AuthedGuard, ServiceGuard } from '../guards/role.guards';
 import { ReqCtx, dropNulls } from '../helpers';
@@ -64,20 +66,50 @@ export class MethodsResolver {
   }
 
   /**
-   * Экран настроек юзера: все user-методы, включая выключенные —
+   * Экран настроек юзера: все user/default-методы, включая выключенные —
    * twoFaMethods их не показывает (контракт «что требует 2ФА сейчас»).
    */
   // @UseGuards(AuthedGuard)
   @Query(() => [MyTwoFaMethodDto], {
     name: 'myTwoFaMethods',
     description:
-      'Все методы, настраиваемые юзером (тег user), включая выключенные. ' +
-      'Для каждого — allowedTypes (набор админа), enabledTypes (действующие ' +
-      'для юзера) и isEnabled. Источник id и типов для updateMyTwoFaMethod. ' +
+      'Все методы, настраиваемые юзером (теги user и default), включая ' +
+      'выключенные. Для каждого — allowedTypes (набор админа), enabledTypes ' +
+      '(действующие для юзера), isEnabled и managedBy (METHOD — ' +
+      'updateMyTwoFaMethod, GLOBAL — updateMyTwoFaDefaults). ' +
       'Требуется заголовок x-user-id.',
   })
   myTwoFaMethods(@ReqCtx() ctx: RequestContext): Promise<MyTwoFaMethodDto[]> {
     return this._userSettings.listMyMethods(ctx.userId as string);
+  }
+
+  // @UseGuards(AuthedGuard)
+  @Query(() => MyTwoFaSettingsDto, {
+    name: 'myTwoFaSettings',
+    description:
+      'Настройки 2ФА уровня аккаунта: общий переключатель default-методов. ' +
+      'Требуется заголовок x-user-id.',
+  })
+  myTwoFaSettings(@ReqCtx() ctx: RequestContext): Promise<MyTwoFaSettingsDto> {
+    return this._userSettings.getMySettings(ctx.userId as string);
+  }
+
+  /** Общий рубильник: вкл/выкл 2ФА на всех default-методах разом. */
+  // @UseGuards(AuthedGuard)
+  @Mutation(() => MyTwoFaSettingsDto, {
+    description:
+      'Включает/выключает 2ФА разом на всех методах режима default. ' +
+      'На методы с тегами user (индивидуальные настройки) и system ' +
+      '(обязательная 2ФА) не влияет. Требуется заголовок x-user-id.',
+  })
+  updateMyTwoFaDefaults(
+    @ReqCtx() ctx: RequestContext,
+    @Args('input') input: UpdateMyTwoFaDefaultsInput,
+  ): Promise<MyTwoFaSettingsDto> {
+    return this._userSettings.updateMyDefaults(
+      ctx.userId as string,
+      input.isEnabled,
+    );
   }
 
   // @UseGuards(AuthedGuard)

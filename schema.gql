@@ -16,6 +16,11 @@ input CreateMethodsInput {
 type Mutation {
   createTwoFaMethod(input: CreateMethodsInput!): [TwoFaMethod!]!
   sendTwoFa(input: SendTwoFaInput!): SendTwoFaResponse!
+
+  """
+  Включает/выключает 2ФА разом на всех методах режима default. На методы с тегами user (индивидуальные настройки) и system (обязательная 2ФА) не влияет. Требуется заголовок x-user-id.
+  """
+  updateMyTwoFaDefaults(input: UpdateMyTwoFaDefaultsInput!): MyTwoFaSettings!
   updateMyTwoFaMethod(input: UpdateMyMethodsInput!): [TwoFaMethod!]!
   updateTwoFaListMethods: UpdateListMethodsResponse!
   updateTwoFaMethod(input: UpdateMethodsInput!): [TwoFaMethod!]!
@@ -23,7 +28,7 @@ type Mutation {
 }
 
 """
-Настройки 2ФА юзера по методу с тегом user. В отличие от twoFaMethods, выключенные методы остаются в списке — экран настроек видит их id и полный набор доступных типов.
+Настройки 2ФА юзера по методу с тегом user или default. В отличие от twoFaMethods, выключенные методы остаются в списке — экран настроек видит их id и полный набор доступных типов.
 """
 type MyTwoFaMethod {
   """Полный набор типов, разрешённый админом, — из чего выбирать"""
@@ -35,8 +40,13 @@ type MyTwoFaMethod {
   """id метода (methods.id)"""
   id: ID!
 
-  """Требует ли метод 2ФА для юзера с учётом его переопределения"""
+  """Требует ли метод 2ФА для юзера с учётом его настроек"""
   isEnabled: Boolean!
+
+  """
+  METHOD — переключается updateMyTwoFaMethod; GLOBAL — общим переключателем updateMyTwoFaDefaults
+  """
+  managedBy: TwoFaManagedBy!
 
   """Имя метода (transfer, signin, ...)"""
   method: String!
@@ -45,11 +55,24 @@ type MyTwoFaMethod {
   tags: [String!]!
 }
 
+"""Настройки 2ФА юзера уровня аккаунта."""
+type MyTwoFaSettings {
+  """
+  Общий переключатель: false гасит 2ФА на всех default-методах разом; user- и system-методы не затрагивает
+  """
+  defaultMethodsEnabled: Boolean!
+}
+
 type Query {
   """
-  Все методы, настраиваемые юзером (тег user), включая выключенные. Для каждого — allowedTypes (набор админа), enabledTypes (действующие для юзера) и isEnabled. Источник id и типов для updateMyTwoFaMethod. Требуется заголовок x-user-id.
+  Все методы, настраиваемые юзером (теги user и default), включая выключенные. Для каждого — allowedTypes (набор админа), enabledTypes (действующие для юзера), isEnabled и managedBy (METHOD — updateMyTwoFaMethod, GLOBAL — updateMyTwoFaDefaults). Требуется заголовок x-user-id.
   """
   myTwoFaMethods: [MyTwoFaMethod!]!
+
+  """
+  Настройки 2ФА уровня аккаунта: общий переключатель default-методов. Требуется заголовок x-user-id.
+  """
+  myTwoFaSettings: MyTwoFaSettings!
   twoFaMethods(input: TwoFaMethodsInput): TwoFaMethodsResponse!
   twoFaTypes: [TwoFaType!]!
 }
@@ -71,6 +94,14 @@ type SendTwoFaTypeDto {
   identity: String
   retry: Int
   type: String!
+}
+
+"""
+METHOD — индивидуальный выключатель (updateMyTwoFaMethod, тег user); GLOBAL — общий переключатель default-методов (updateMyTwoFaDefaults).
+"""
+enum TwoFaManagedBy {
+  GLOBAL
+  METHOD
 }
 
 type TwoFaMethod {
@@ -140,6 +171,11 @@ input UpdateMyMethodInputDto {
 
 input UpdateMyMethodsInput {
   methods: [UpdateMyMethodInputDto!]!
+}
+
+input UpdateMyTwoFaDefaultsInput {
+  """Включить (true) или выключить (false) default-2ФА"""
+  isEnabled: Boolean!
 }
 
 input VerifyCodeInput {

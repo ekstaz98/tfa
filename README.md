@@ -72,10 +72,14 @@ npm run migration:revert
   клиента: только методы, реально требующие 2ФА для актора; hash совпал →
   `{ upToDate: true, methods: null }`;
 - `Query myTwoFaMethods` — экран настроек юзера (заголовок `x-user-id`):
-  все методы с тегом `user`, включая выключенные юзером; на каждый —
+  все методы с тегами `user`/`default`, включая выключенные; на каждый —
   `allowedTypes` (набор админа), `enabledTypes` (действующие сейчас;
-  пусто = 2ФА выключена) и `isEnabled`. Источник `id` и типов для
-  `updateMyTwoFaMethod`;
+  пусто = 2ФА выключена), `isEnabled` и `managedBy` (`METHOD` —
+  индивидуальный выключатель, `GLOBAL` — общий переключатель);
+- `Query myTwoFaSettings` / `Mutation updateMyTwoFaDefaults(input:
+  { isEnabled })` — общий переключатель юзера: гасит/включает 2ФА разом
+  на всех методах режима `default`; `user`- и `system`-методы не
+  затрагивает;
 - `Mutation sendTwoFa(input: { method, identity?, types?, locale? })` —
   `identity` обязателен без авторизации и запрещён при ней; заголовок
   `x-2fa-operationid` включает переотправку (`types` — её подмножество);
@@ -173,10 +177,12 @@ providerName события задаётся в `SEND_PROVIDER_MAP`. Типу с
 `updateListMethods` (новый метод из схемы гейтвея создаётся активным с
 пустыми types/tags — 2ФА не требует, пока админ не настроит). Поведение
 метода определяется только тегами: `system` — обязателен для всех, не
-отключается; `default` (или без режимного тега) — конфигурация метода для
-всех; `user` — юзер переопределяет через `updateMyTwoFaMethod`; `unauthed` —
-доступен без токена; `system + unauthed` = регистрационный (код уходит на
-незнакомый identity).
+отключается; `default` (или без режимного тега) — конфигурация админа,
+но юзер гасит/включает **все** такие методы разом общим переключателем
+`updateMyTwoFaDefaults` (`users.default_methods_enabled`); `user` — юзер
+управляет каждым методом индивидуально через `updateMyTwoFaMethod`;
+`unauthed` — доступен без токена; `system + unauthed` = регистрационный
+(код уходит на незнакомый identity).
 
 ## Тесты
 

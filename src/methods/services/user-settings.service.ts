@@ -12,8 +12,13 @@ import {
 import { DictionaryCacheService } from '../../database/services';
 import { Method, User, UserMethod } from '../../database/entities';
 import { TwoFaError, TwoFaErrorCode } from '../../errors';
-import { TAG_USER, TOTP_TYPE } from '../constants';
-import { MethodView, MyMethodView, UpdateMyMethodInput } from '../interfaces';
+import { TAG_SYSTEM, TAG_USER, TOTP_TYPE } from '../constants';
+import {
+  MethodView,
+  MyMethodView,
+  MyTwoFaSettingsView,
+  UpdateMyMethodInput,
+} from '../interfaces';
 
 /**
  * updateMyTwoFaMethod: переопределение методов юзером. Разрешено только
@@ -41,13 +46,7 @@ export class UserSettingsService {
     coreUserId: string,
     inputs: UpdateMyMethodInput[],
   ): Promise<MethodView[]> {
-    const [user] = await this._usersCrud.findBy({ userId: coreUserId });
-    if (!user) {
-      throw new TwoFaError(
-        TwoFaErrorCode.IdentityNotFound,
-        'User is not synchronized with 2FA service',
-      );
-    }
+    const user = await this._requireUser(coreUserId);
     const {
       activeTypeByName: typeByName,
       activeTypeNameById: typeNameById,
@@ -71,19 +70,14 @@ export class UserSettingsService {
   }
 
   /**
-   * Query myTwoFaMethods: все настраиваемые юзером методы (тег user),
-   * включая выключенные и с нулём эффективных типов — twoFaMethods такие
-   * не показывает, а экрану настроек нужны и id для повторного включения,
-   * и allowedTypes для выбора. isEnabled = метод реально требует 2ФА.
+   * Query myTwoFaMethods: все настраиваемые юзером методы (теги
+   * user/default), включая выключенные и с нулём эффективных типов —
+   * twoFaMethods такие не показывает, а экрану настроек нужны и id для
+   * повторного включения, и allowedTypes для выбора.
+   * isEnabled = метод реально требует 2ФА.
    */
   async listMyMethods(coreUserId: string): Promise<MyMethodView[]> {
-    const [user] = await this._usersCrud.findBy({ userId: coreUserId });
-    if (!user) {
-      throw new TwoFaError(
-        TwoFaErrorCode.IdentityNotFound,
-        'User is not synchronized with 2FA service',
-      );
-    }
+    const user = await this._requireUser(coreUserId);
     const { tagNameById, activeTypeNameById } =
       await this._dictionaryCache.get();
 
@@ -121,24 +115,32 @@ export class UserSettingsService {
       const tagNames = tagRows
         .filter((row) => row.methodId === method.id)
         .map((row) => tagNameById.get(row.tagId) as string);
-      if (!tagNames.includes(TAG_USER)) {
+      // system юзером не управляется вовсе; default — общим переключателем
+      if (tagNames.includes(TAG_SYSTEM)) {
         continue;
       }
+      const managedBy = tagNames.includes(TAG_USER)
+        ? ('method' as const)
+        : ('global' as const);
       const allowedTypes = typeRows
         .filter((row) => row.methodId === method.id)
         .map((row) => activeTypeNameById.get(row.typeId))
         .filter((name): name is string => name !== undefined)
         .sort();
 
-      const override = overrideByMethodId.get(method.id);
       let enabledTypes = allowedTypes;
-      if (override) {
-        enabledTypes = override.isActive
-          ? (overrideTypeIdsByUserMethodId.get(override.id) ?? [])
-              .map((typeId) => activeTypeNameById.get(typeId))
-              .filter((name): name is string => name !== undefined)
-              .sort()
-          : [];
+      if (managedBy === 'method') {
+        const override = overrideByMethodId.get(method.id);
+        if (override) {
+          enabledTypes = override.isActive
+            ? (overrideTypeIdsByUserMethodId.get(override.id) ?? [])
+                .map((typeId) => activeTypeNameById.get(typeId))
+                .filter((name): name is string => name !== undefined)
+                .sort()
+            : [];
+        }
+      } else if (managedBy === 'global' && !user.defaultMethodsEnabled) {
+        enabledTypes = [];
       }
 
       views.push({
@@ -148,9 +150,45 @@ export class UserSettingsService {
         allowedTypes,
         enabledTypes,
         tags: [...tagNames].sort(),
+        managedBy,
       });
     }
     return views;
+  }
+
+  /** Query myTwoFaSettings: общий переключатель default-методов. */
+  async getMySettings(coreUserId: string): Promise<MyTwoFaSettingsView> {
+    const user = await this._requireUser(coreUserId);
+    return { defaultMethodsEnabled: user.defaultMethodsEnabled };
+  }
+
+  /**
+   * Mutation updateMyTwoFaDefaults: вкл/выкл 2ФА разом на всех методах
+   * режима default. На user-методы (индивидуальные переопределения)
+   * и system не влияет.
+   */
+  async updateMyDefaults(
+    coreUserId: string,
+    isEnabled: boolean,
+  ): Promise<MyTwoFaSettingsView> {
+    const user = await this._requireUser(coreUserId);
+    if (user.defaultMethodsEnabled !== isEnabled) {
+      await this._usersCrud.update(user.id, {
+        defaultMethodsEnabled: isEnabled,
+      });
+    }
+    return { defaultMethodsEnabled: isEnabled };
+  }
+
+  private async _requireUser(coreUserId: string): Promise<User> {
+    const [user] = await this._usersCrud.findBy({ userId: coreUserId });
+    if (!user) {
+      throw new TwoFaError(
+        TwoFaErrorCode.IdentityNotFound,
+        'User is not synchronized with 2FA service',
+      );
+    }
+    return user;
   }
 
   private async _updateOne(

@@ -34,17 +34,28 @@ export interface UpdateMyMethodInput {
 }
 
 /**
- * Элемент ответа myTwoFaMethods — настройки юзера по user-методу.
+ * Элемент ответа myTwoFaMethods — настройки юзера по user/default-методу.
  * В отличие от MethodView, выключенные методы не выпадают из списка.
  */
 export interface MyMethodView {
   id: string;
   method: string;
-  /** Требует ли метод 2ФА для юзера с учётом его переопределения. */
+  /** Требует ли метод 2ФА для юзера с учётом его настроек. */
   isEnabled: boolean;
   /** Полный набор типов, разрешённый админом, — из чего юзер выбирает. */
   allowedTypes: string[];
   /** Типы, действующие для юзера сейчас; пусто, если 2ФА выключена. */
   enabledTypes: string[];
   tags: string[];
+  /**
+   * Чем управляется метод: method — индивидуальный выключатель
+   * (updateMyTwoFaMethod), global — общий переключатель default-методов
+   * (updateMyTwoFaDefaults).
+   */
+  managedBy: 'method' | 'global';
+}
+
+/** Ответ myTwoFaSettings / updateMyTwoFaDefaults. */
+export interface MyTwoFaSettingsView {
+  defaultMethodsEnabled: boolean;
 }

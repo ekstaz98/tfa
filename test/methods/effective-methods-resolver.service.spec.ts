@@ -31,7 +31,9 @@ describe('EffectiveMethodsResolverService.resolve', () => {
   let user: User;
 
   beforeEach(() => {
-    usersCrud = new FakeCrud<User>();
+    usersCrud = new FakeCrud<User>({
+      defaultMethodsEnabled: true,
+    } as Partial<User>);
     methodsCrud = new FakeCrud<Method>({
       isActive: true,
       isDeleted: false,
@@ -192,6 +194,59 @@ describe('EffectiveMethodsResolverService.resolve', () => {
     addMethod('withdraw', [], []);
 
     expect(await service.resolve(CORE_USER_ID)).toEqual([]);
+  });
+
+  describe('общий переключатель default-методов', () => {
+    it('off гасит default и безрежимные методы; user и system остаются', async () => {
+      user.defaultMethodsEnabled = false;
+      addMethod('transfer', ['sms'], ['default']);
+      addMethod('plain', ['sms'], []);
+      addMethod('secure', ['sms'], ['user']);
+      addMethod('signup', ['sms'], ['system', 'unauthed']);
+
+      const views = await service.resolve(CORE_USER_ID);
+
+      expect(views.map((view) => view.method).sort()).toEqual([
+        'secure',
+        'signup',
+      ]);
+    });
+
+    it('resolveMethodTypes: default-метод гаснет по флагу', async () => {
+      user.defaultMethodsEnabled = false;
+      const transfer = addMethod('transfer', ['sms', 'email'], ['default']);
+
+      expect(
+        await service.resolveMethodTypes(transfer, ['default'], CORE_USER_ID),
+      ).toEqual([]);
+      expect(
+        await service.resolveMethodTypes(transfer, ['default'], user),
+      ).toEqual([]);
+    });
+
+    it('resolveMethodTypes: system не гасится флагом', async () => {
+      user.defaultMethodsEnabled = false;
+      const signup = addMethod('signup', ['sms'], ['system', 'unauthed']);
+
+      expect(
+        await service.resolveMethodTypes(
+          signup,
+          ['system', 'unauthed'],
+          CORE_USER_ID,
+        ),
+      ).toEqual(['sms']);
+    });
+
+    it('аноним/несинхронизированный: флаг не применяется, действует конфиг', async () => {
+      const plain = addMethod('plain', ['sms'], ['unauthed']);
+      // метод unauthed без режимного тега — виден анониму по конфигурации
+      expect(
+        await service.resolveMethodTypes(plain, ['unauthed'], null),
+      ).toEqual(['sms']);
+      expect(
+        await service.resolveMethodTypes(plain, ['unauthed'], 'ghost-user'),
+      ).toEqual(['sms']);
+    });
   });
 
   describe('resolveMethodTypes (узкий резолв одного метода)', () => {

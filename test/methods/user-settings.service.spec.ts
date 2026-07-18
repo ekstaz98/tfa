@@ -35,7 +35,9 @@ describe('UserSettingsService.updateMyMethods', () => {
   let transfer: Method;
 
   beforeEach(() => {
-    usersCrud = new FakeCrud<User>();
+    usersCrud = new FakeCrud<User>({
+      defaultMethodsEnabled: true,
+    } as Partial<User>);
     credentialsCrud = new FakeCrud<UserCredential>();
     userMethodsCrud = new FakeCrud<UserMethod>({
       isActive: true,
@@ -262,6 +264,7 @@ describe('UserSettingsService.updateMyMethods', () => {
           allowedTypes: ['email', 'sms'],
           enabledTypes: ['email', 'sms'],
           tags: ['user'],
+          managedBy: 'method',
         },
       ]);
     });
@@ -291,15 +294,45 @@ describe('UserSettingsService.updateMyMethods', () => {
       expect(view.allowedTypes).toEqual(['email', 'sms']);
     });
 
-    it('system- и default-методы в список не попадают', async () => {
+    it('system не попадает; default попадает с managedBy: global', async () => {
       const signup = methodsCrud.seed({ method: 'signup' } as Partial<Method>);
       methodTagsCrud.seed({ methodId: signup.id, tagId: 'tag-system' });
       const plain = methodsCrud.seed({ method: 'plain' } as Partial<Method>);
       methodTagsCrud.seed({ methodId: plain.id, tagId: 'tag-default' });
+      methodTypesCrud.seed({ methodId: plain.id, typeId: 'type-sms' });
 
       const views = await service.listMyMethods(CORE_USER_ID);
 
-      expect(views.map((view) => view.method)).toEqual(['transfer']);
+      expect(views.map((view) => view.method).sort()).toEqual([
+        'plain',
+        'transfer',
+      ]);
+      const plainView = views.find((view) => view.method === 'plain');
+      expect(plainView).toMatchObject({
+        managedBy: 'global',
+        isEnabled: true,
+        enabledTypes: ['sms'],
+      });
+    });
+
+    it('общий переключатель off гасит default-методы, user-методы не трогает', async () => {
+      const plain = methodsCrud.seed({ method: 'plain' } as Partial<Method>);
+      methodTagsCrud.seed({ methodId: plain.id, tagId: 'tag-default' });
+      methodTypesCrud.seed({ methodId: plain.id, typeId: 'type-sms' });
+      await service.updateMyDefaults(CORE_USER_ID, false);
+
+      const views = await service.listMyMethods(CORE_USER_ID);
+
+      expect(views.find((view) => view.method === 'plain')).toMatchObject({
+        isEnabled: false,
+        enabledTypes: [],
+        allowedTypes: ['sms'],
+        managedBy: 'global',
+      });
+      expect(views.find((view) => view.method === 'transfer')).toMatchObject({
+        isEnabled: true,
+        managedBy: 'method',
+      });
     });
 
     it('выключенный/удалённый админом метод не попадает', async () => {
@@ -321,5 +354,31 @@ describe('UserSettingsService.updateMyMethods', () => {
 
     it('несинхронизированный юзер → UNKNOWN_IDENTITY-015', () =>
       expectCode(service.listMyMethods('ghost'), 'UNKNOWN_IDENTITY-015'));
+  });
+
+  describe('getMySettings / updateMyDefaults (общий переключатель)', () => {
+    it('дефолт — включено; updateMyDefaults переключает и персистит', async () => {
+      expect(await service.getMySettings(CORE_USER_ID)).toEqual({
+        defaultMethodsEnabled: true,
+      });
+
+      const updated = await service.updateMyDefaults(CORE_USER_ID, false);
+      expect(updated).toEqual({ defaultMethodsEnabled: false });
+      expect(user.defaultMethodsEnabled).toBe(false);
+      expect(await service.getMySettings(CORE_USER_ID)).toEqual({
+        defaultMethodsEnabled: false,
+      });
+    });
+
+    it('повторная установка того же значения не пишет в базу', async () => {
+      await service.updateMyDefaults(CORE_USER_ID, true);
+      expect(usersCrud.update).not.toHaveBeenCalled();
+    });
+
+    it('несинхронизированный юзер → UNKNOWN_IDENTITY-015', () =>
+      expectCode(
+        service.updateMyDefaults('ghost', false),
+        'UNKNOWN_IDENTITY-015',
+      ));
   });
 });
