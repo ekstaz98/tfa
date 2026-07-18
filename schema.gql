@@ -22,7 +22,34 @@ type Mutation {
   verifyTwoFa(input: VerifyTwoFaInput!): VerifyTwoFaResponse!
 }
 
+"""
+Настройки 2ФА юзера по методу с тегом user. В отличие от twoFaMethods, выключенные методы остаются в списке — экран настроек видит их id и полный набор доступных типов.
+"""
+type MyTwoFaMethod {
+  """Полный набор типов, разрешённый админом, — из чего выбирать"""
+  allowedTypes: [String!]!
+
+  """Типы, действующие для юзера сейчас; пусто — 2ФА выключена"""
+  enabledTypes: [String!]!
+
+  """id метода (methods.id)"""
+  id: ID!
+
+  """Требует ли метод 2ФА для юзера с учётом его переопределения"""
+  isEnabled: Boolean!
+
+  """Имя метода (transfer, signin, ...)"""
+  method: String!
+
+  """Теги метода"""
+  tags: [String!]!
+}
+
 type Query {
+  """
+  Все методы, настраиваемые юзером (тег user), включая выключенные. Для каждого — allowedTypes (набор админа), enabledTypes (действующие для юзера) и isEnabled. Источник id и типов для updateMyTwoFaMethod. Требуется заголовок x-user-id.
+  """
+  myTwoFaMethods: [MyTwoFaMethod!]!
   twoFaMethods(input: TwoFaMethodsInput): TwoFaMethodsResponse!
   twoFaTypes: [TwoFaType!]!
 }

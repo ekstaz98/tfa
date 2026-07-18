@@ -60,30 +60,40 @@ npm run migration:revert
 
 ## GraphQL API
 
-Схема генерируется в `schema.gql` при старте. Имена `2faTypes`/`2faMethods`
-из ТЗ невозможны в GraphQL (имя не может начинаться с цифры) →
-`twoFaTypes`/`twoFaMethods`; остальные имена — по ТЗ.
+Схема генерируется в `schema.gql` при старте. Имена из ТЗ вида `2fa*`
+невозможны в GraphQL (имя не может начинаться с цифры) и переименованы в
+`twoFa*`/`TwoFa*`. Типы и теги во входных параметрах — енамы
+`TwoFaMethodType` (`SMS`, `EMAIL`, `PUSH`, `GA`) и `TwoFaMethodTag`
+(`UNAUTHED`, `USER`, `SYSTEM`, `DEFAULT`); в ответах — строки в нижнем
+регистре, как в базе.
 
 - `Query twoFaTypes` — справочник типов;
 - `Query twoFaMethods(input: { hash, tags })` — эффективный список для
-  клиента; hash совпал → `{ upToDate: true, methods: null }`;
-- `Mutation send2Fa(input: { method, identity?, types?, locale? })` —
+  клиента: только методы, реально требующие 2ФА для актора; hash совпал →
+  `{ upToDate: true, methods: null }`;
+- `Query myTwoFaMethods` — экран настроек юзера (заголовок `x-user-id`):
+  все методы с тегом `user`, включая выключенные юзером; на каждый —
+  `allowedTypes` (набор админа), `enabledTypes` (действующие сейчас;
+  пусто = 2ФА выключена) и `isEnabled`. Источник `id` и типов для
+  `updateMyTwoFaMethod`;
+- `Mutation sendTwoFa(input: { method, identity?, types?, locale? })` —
   `identity` обязателен без авторизации и запрещён при ней; заголовок
   `x-2fa-operationid` включает переотправку (`types` — её подмножество);
-- `Mutation create2faMethod / update2faMethod` — роль `admin`;
-- `Mutation updateMy2faMethod` — юзер (заголовок `x-user-id`), только методы
-  с тегом `user`;
-- `Mutation updateListMethods` — роль `service`, автосинк методов
+- `Mutation createTwoFaMethod / updateTwoFaMethod` — роль `admin`;
+- `Mutation updateMyTwoFaMethod` — юзер (заголовок `x-user-id`), только методы
+  с тегом `user`; `isActive: false` выключает 2ФА по методу, включение
+  обратно — `isActive: true` + явный список `types`;
+- `Mutation updateTwoFaListMethods` — роль `service`, автосинк методов
   интроспекцией схемы гейтвея;
-- `Mutation verify2fa` — роль `service`, две формы (ниже).
+- `Mutation verifyTwoFa` — роль `service`, две формы (ниже).
 
 Ошибки — всегда `{"errors":[{ message, title, code, status }]}`
 (коды `UNKNOWN_TAG-001` … по ТЗ + скелетные 006–019).
 
-### verify2fa (контракт для гейтвея)
+### verifyTwoFa (контракт для гейтвея)
 
 ```graphql
-verify2fa(input: {
+verifyTwoFa(input: {
   operationId: ID       # опционально
   method: String!
   userId: String        # authed-запросы
@@ -106,7 +116,7 @@ verify2fa(input: {
   запятую), `x-client-ip` (опора часового лимита unauthed-операций),
   `x-2fa-operationid` (переотправка);
 - для unauthed-методов гейтвей обязан извлечь identity из тела запроса и
-  передать его в `verify2fa`/`send2Fa`.
+  передать его в `verifyTwoFa`/`sendTwoFa`.
 
 Авторизация — зона гейтвея: сервис доверяет заголовкам, guards — заглушки.
 
@@ -159,12 +169,12 @@ providerName события задаётся в `SEND_PROVIDER_MAP`. Типу с
 верификацией (как `ga`) — реализация `CodeVerifierPort` + регистрация в
 `VerifierRegistry`.
 
-**Новый метод** — админ-мутация `create2faMethod` или автосинк
+**Новый метод** — админ-мутация `createTwoFaMethod` или автосинк
 `updateListMethods` (новый метод из схемы гейтвея создаётся активным с
 пустыми types/tags — 2ФА не требует, пока админ не настроит). Поведение
 метода определяется только тегами: `system` — обязателен для всех, не
 отключается; `default` (или без режимного тега) — конфигурация метода для
-всех; `user` — юзер переопределяет через `updateMy2faMethod`; `unauthed` —
+всех; `user` — юзер переопределяет через `updateMyTwoFaMethod`; `unauthed` —
 доступен без токена; `system + unauthed` = регистрационный (код уходит на
 незнакомый identity).
 
@@ -177,7 +187,7 @@ npm run test:e2e   # нужен docker compose (postgres + rabbitmq)
 
 e2e ходят в отдельные базы (`tfa_e2e*`, пересоздаются при прогоне), включая
 сквозной сценарий: регистрация → RMQ-событие юзера → signin по identity →
-updateMy2faMethod → transfer через verify2fa.
+updateMyTwoFaMethod → transfer через verifyTwoFa.
 
 ## Вне скоупа скелета
 

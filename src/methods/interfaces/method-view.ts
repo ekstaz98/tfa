@@ -32,3 +32,19 @@ export interface UpdateMyMethodInput {
   /** undefined — не менять; [] — отключить все типы. */
   types?: string[];
 }
+
+/**
+ * Элемент ответа myTwoFaMethods — настройки юзера по user-методу.
+ * В отличие от MethodView, выключенные методы не выпадают из списка.
+ */
+export interface MyMethodView {
+  id: string;
+  method: string;
+  /** Требует ли метод 2ФА для юзера с учётом его переопределения. */
+  isEnabled: boolean;
+  /** Полный набор типов, разрешённый админом, — из чего юзер выбирает. */
+  allowedTypes: string[];
+  /** Типы, действующие для юзера сейчас; пусто, если 2ФА выключена. */
+  enabledTypes: string[];
+  tags: string[];
+}

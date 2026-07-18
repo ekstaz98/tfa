@@ -457,4 +457,89 @@ describe('2FA API (e2e)', () => {
       expect(after.data!.verifyTwoFa.required).toBe(false);
     });
   });
+
+  describe('myTwoFaMethods — настройки юзера', () => {
+    const MY_METHODS = `{
+      myTwoFaMethods { id method isEnabled allowedTypes enabledTypes tags }
+    }`;
+
+    it('выключенный signin остаётся в списке, в twoFaMethods его нет', async () => {
+      // signin выключен юзером в предыдущем тесте
+      const body = await gql(MY_METHODS, undefined, AUTHED);
+      expect(body.errors).toBeUndefined();
+      const byName = new Map(
+        (body.data!.myTwoFaMethods as Array<{ method: string }>).map((view) => [
+          view.method,
+          view,
+        ]),
+      );
+
+      expect(byName.get('signin')).toEqual({
+        id: methodIds.signin,
+        method: 'signin',
+        isEnabled: false,
+        allowedTypes: ['email'],
+        enabledTypes: [],
+        tags: ['unauthed', 'user'],
+      });
+      expect(byName.get('transfer')).toMatchObject({
+        isEnabled: true,
+        allowedTypes: ['email', 'sms'],
+      });
+      // system-метод signup юзеру не настраивается — его в списке нет
+      expect(byName.has('signup')).toBe(false);
+
+      const effective = await gql(
+        `{ twoFaMethods { methods { method } } }`,
+        undefined,
+        AUTHED,
+      );
+      expect(
+        (effective.data!.twoFaMethods.methods as Array<{ method: string }>)
+          .map((view) => view.method)
+          .sort(),
+      ).not.toContain('signin');
+    });
+
+    it('после включения обратно isEnabled: true и метод снова в twoFaMethods', async () => {
+      const updated = await gql(
+        `mutation($input: UpdateMyMethodsInput!) {
+          updateMyTwoFaMethod(input: $input) { id isActive types }
+        }`,
+        {
+          input: {
+            methods: [
+              { id: methodIds.signin, isActive: true, types: ['EMAIL'] },
+            ],
+          },
+        },
+        AUTHED,
+      );
+      expect(updated.errors).toBeUndefined();
+
+      const body = await gql(MY_METHODS, undefined, AUTHED);
+      const signin = (
+        body.data!.myTwoFaMethods as Array<{
+          method: string;
+          isEnabled: boolean;
+          enabledTypes: string[];
+        }>
+      ).find((view) => view.method === 'signin');
+      expect(signin).toMatchObject({
+        isEnabled: true,
+        enabledTypes: ['email'],
+      });
+
+      const effective = await gql(
+        `{ twoFaMethods { methods { method } } }`,
+        undefined,
+        AUTHED,
+      );
+      expect(
+        (effective.data!.twoFaMethods.methods as Array<{ method: string }>).map(
+          (view) => view.method,
+        ),
+      ).toContain('signin');
+    });
+  });
 });

@@ -249,4 +249,77 @@ describe('UserSettingsService.updateMyMethods', () => {
     ]);
     expect(views[0].types).toEqual(['ga']);
   });
+
+  describe('listMyMethods (Query myTwoFaMethods)', () => {
+    it('без переопределения: метод включён, enabledTypes = allowedTypes', async () => {
+      const views = await service.listMyMethods(CORE_USER_ID);
+
+      expect(views).toEqual([
+        {
+          id: transfer.id,
+          method: 'transfer',
+          isEnabled: true,
+          allowedTypes: ['email', 'sms'],
+          enabledTypes: ['email', 'sms'],
+          tags: ['user'],
+        },
+      ]);
+    });
+
+    it('сужение типов отражается в enabledTypes, allowedTypes не меняется', async () => {
+      await service.updateMyMethods(CORE_USER_ID, [
+        { id: transfer.id, types: ['email'] },
+      ]);
+
+      const [view] = await service.listMyMethods(CORE_USER_ID);
+
+      expect(view.allowedTypes).toEqual(['email', 'sms']);
+      expect(view.enabledTypes).toEqual(['email']);
+      expect(view.isEnabled).toBe(true);
+    });
+
+    it('выключенный метод остаётся в списке с isEnabled: false', async () => {
+      await service.updateMyMethods(CORE_USER_ID, [
+        { id: transfer.id, isActive: false, types: [] },
+      ]);
+
+      const [view] = await service.listMyMethods(CORE_USER_ID);
+
+      expect(view.id).toBe(transfer.id);
+      expect(view.isEnabled).toBe(false);
+      expect(view.enabledTypes).toEqual([]);
+      expect(view.allowedTypes).toEqual(['email', 'sms']);
+    });
+
+    it('system- и default-методы в список не попадают', async () => {
+      const signup = methodsCrud.seed({ method: 'signup' } as Partial<Method>);
+      methodTagsCrud.seed({ methodId: signup.id, tagId: 'tag-system' });
+      const plain = methodsCrud.seed({ method: 'plain' } as Partial<Method>);
+      methodTagsCrud.seed({ methodId: plain.id, tagId: 'tag-default' });
+
+      const views = await service.listMyMethods(CORE_USER_ID);
+
+      expect(views.map((view) => view.method)).toEqual(['transfer']);
+    });
+
+    it('выключенный/удалённый админом метод не попадает', async () => {
+      const off = methodsCrud.seed({
+        method: 'off',
+        isActive: false,
+      } as Partial<Method>);
+      methodTagsCrud.seed({ methodId: off.id, tagId: 'tag-user' });
+      const gone = methodsCrud.seed({
+        method: 'gone',
+        isDeleted: true,
+      } as Partial<Method>);
+      methodTagsCrud.seed({ methodId: gone.id, tagId: 'tag-user' });
+
+      const views = await service.listMyMethods(CORE_USER_ID);
+
+      expect(views.map((view) => view.method)).toEqual(['transfer']);
+    });
+
+    it('несинхронизированный юзер → UNKNOWN_IDENTITY-015', () =>
+      expectCode(service.listMyMethods('ghost'), 'UNKNOWN_IDENTITY-015'));
+  });
 });

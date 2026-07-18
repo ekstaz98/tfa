@@ -9,6 +9,7 @@ import {
 } from '../../methods/services';
 import {
   CreateMethodsInput,
+  MyTwoFaMethodDto,
   TwoFaMethodDto,
   TwoFaMethodsInput,
   TwoFaMethodsResponse,
@@ -60,6 +61,23 @@ export class MethodsResolver {
     @Args('input') input: UpdateMethodsInput,
   ): Promise<TwoFaMethodDto[]> {
     return this._adminService.updateMethods(input.methods.map(dropNulls));
+  }
+
+  /**
+   * Экран настроек юзера: все user-методы, включая выключенные —
+   * twoFaMethods их не показывает (контракт «что требует 2ФА сейчас»).
+   */
+  // @UseGuards(AuthedGuard)
+  @Query(() => [MyTwoFaMethodDto], {
+    name: 'myTwoFaMethods',
+    description:
+      'Все методы, настраиваемые юзером (тег user), включая выключенные. ' +
+      'Для каждого — allowedTypes (набор админа), enabledTypes (действующие ' +
+      'для юзера) и isEnabled. Источник id и типов для updateMyTwoFaMethod. ' +
+      'Требуется заголовок x-user-id.',
+  })
+  myTwoFaMethods(@ReqCtx() ctx: RequestContext): Promise<MyTwoFaMethodDto[]> {
+    return this._userSettings.listMyMethods(ctx.userId as string);
   }
 
   // @UseGuards(AuthedGuard)

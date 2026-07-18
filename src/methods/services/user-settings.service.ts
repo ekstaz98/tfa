@@ -13,7 +13,7 @@ import { DictionaryCacheService } from '../../database/services';
 import { Method, User, UserMethod } from '../../database/entities';
 import { TwoFaError, TwoFaErrorCode } from '../../errors';
 import { TAG_USER, TOTP_TYPE } from '../constants';
-import { MethodView, UpdateMyMethodInput } from '../interfaces';
+import { MethodView, MyMethodView, UpdateMyMethodInput } from '../interfaces';
 
 /**
  * updateMyTwoFaMethod: переопределение методов юзером. Разрешено только
@@ -68,6 +68,89 @@ export class UserSettingsService {
       }
       return views;
     });
+  }
+
+  /**
+   * Query myTwoFaMethods: все настраиваемые юзером методы (тег user),
+   * включая выключенные и с нулём эффективных типов — twoFaMethods такие
+   * не показывает, а экрану настроек нужны и id для повторного включения,
+   * и allowedTypes для выбора. isEnabled = метод реально требует 2ФА.
+   */
+  async listMyMethods(coreUserId: string): Promise<MyMethodView[]> {
+    const [user] = await this._usersCrud.findBy({ userId: coreUserId });
+    if (!user) {
+      throw new TwoFaError(
+        TwoFaErrorCode.IdentityNotFound,
+        'User is not synchronized with 2FA service',
+      );
+    }
+    const { tagNameById, activeTypeNameById } =
+      await this._dictionaryCache.get();
+
+    const methods = await this._methodsCrud.findBy({
+      isActive: true,
+      isDeleted: false,
+    });
+    if (methods.length === 0) {
+      return [];
+    }
+    const methodIds = methods.map((method) => method.id);
+    const [tagRows, typeRows, userMethods] = await Promise.all([
+      this._methodTagsCrud.findBy({ methodId: In(methodIds) }),
+      this._methodTypesCrud.findBy({ methodId: In(methodIds) }),
+      this._userMethodsCrud.findBy({ userId: user.id, isDeleted: false }),
+    ]);
+    const overrideByMethodId = new Map(
+      userMethods.map((userMethod) => [userMethod.methodId, userMethod]),
+    );
+    const overrideTypeRows =
+      userMethods.length > 0
+        ? await this._userMethodTypesCrud.findBy({
+            userMethodId: In(userMethods.map((userMethod) => userMethod.id)),
+          })
+        : [];
+    const overrideTypeIdsByUserMethodId = new Map<string, string[]>();
+    for (const row of overrideTypeRows) {
+      const list = overrideTypeIdsByUserMethodId.get(row.userMethodId) ?? [];
+      list.push(row.typeId);
+      overrideTypeIdsByUserMethodId.set(row.userMethodId, list);
+    }
+
+    const views: MyMethodView[] = [];
+    for (const method of methods) {
+      const tagNames = tagRows
+        .filter((row) => row.methodId === method.id)
+        .map((row) => tagNameById.get(row.tagId) as string);
+      if (!tagNames.includes(TAG_USER)) {
+        continue;
+      }
+      const allowedTypes = typeRows
+        .filter((row) => row.methodId === method.id)
+        .map((row) => activeTypeNameById.get(row.typeId))
+        .filter((name): name is string => name !== undefined)
+        .sort();
+
+      const override = overrideByMethodId.get(method.id);
+      let enabledTypes = allowedTypes;
+      if (override) {
+        enabledTypes = override.isActive
+          ? (overrideTypeIdsByUserMethodId.get(override.id) ?? [])
+              .map((typeId) => activeTypeNameById.get(typeId))
+              .filter((name): name is string => name !== undefined)
+              .sort()
+          : [];
+      }
+
+      views.push({
+        id: method.id,
+        method: method.method,
+        isEnabled: enabledTypes.length > 0,
+        allowedTypes,
+        enabledTypes,
+        tags: [...tagNames].sort(),
+      });
+    }
+    return views;
   }
 
   private async _updateOne(

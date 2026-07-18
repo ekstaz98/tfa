@@ -40,15 +40,14 @@ export class TwoFaRequirementService {
     let actor: EffectiveActor = params.userId ?? null;
     if (!actor && params.identity) {
       const normalized = this._normalizer.normalize(params.identity);
-      const credentials = await this._credentialsCrud.findBy({
+      const [confirmedCredentials] = await this._credentialsCrud.findBy({
         identity: normalized,
         isDeleted: false,
+        isActive: true,
+        isConfirmed: true,
       });
-      const confirmed = credentials.find(
-        (credential) => credential.isConfirmed && credential.isActive,
-      );
-      if (confirmed) {
-        actor = await this._usersCrud.findById(confirmed.userId);
+      if (confirmedCredentials) {
+        actor = await this._usersCrud.findById(confirmedCredentials.userId);
       }
     }
 

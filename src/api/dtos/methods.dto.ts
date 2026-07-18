@@ -73,6 +73,39 @@ export class TwoFaMethodsResponse {
   methods?: TwoFaMethodDto[] | null;
 }
 
+/** Элемент ответа myTwoFaMethods — настройки 2ФА юзера по user-методу. */
+@ObjectType('MyTwoFaMethod', {
+  description:
+    'Настройки 2ФА юзера по методу с тегом user. В отличие от twoFaMethods, ' +
+    'выключенные методы остаются в списке — экран настроек видит их id и ' +
+    'полный набор доступных типов.',
+})
+export class MyTwoFaMethodDto {
+  @Field(() => ID, { description: 'id метода (methods.id)' })
+  id: string;
+
+  @Field({ description: 'Имя метода (transfer, signin, ...)' })
+  method: string;
+
+  @Field({
+    description: 'Требует ли метод 2ФА для юзера с учётом его переопределения',
+  })
+  isEnabled: boolean;
+
+  @Field(() => [String], {
+    description: 'Полный набор типов, разрешённый админом, — из чего выбирать',
+  })
+  allowedTypes: string[];
+
+  @Field(() => [String], {
+    description: 'Типы, действующие для юзера сейчас; пусто — 2ФА выключена',
+  })
+  enabledTypes: string[];
+
+  @Field(() => [String], { description: 'Теги метода' })
+  tags: string[];
+}
+
 @InputType()
 export class CreateMethodInputDto {
   @Field()
