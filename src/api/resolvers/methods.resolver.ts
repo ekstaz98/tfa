@@ -10,6 +10,7 @@ import {
 import {
   CreateMethodsInput,
   MyTwoFaMethodDto,
+  MyTwoFaMethodsInput,
   MyTwoFaSettingsDto,
   TwoFaMethodDto,
   TwoFaMethodsInput,
@@ -77,10 +78,16 @@ export class MethodsResolver {
       'выключенные. Для каждого — allowedTypes (набор админа), enabledTypes ' +
       '(действующие для юзера), isEnabled и managedBy (METHOD — ' +
       'updateMyTwoFaMethod, GLOBAL — updateMyTwoFaDefaults). ' +
-      'Требуется заголовок x-user-id.',
+      'input — опциональные фильтры выдачи. Требуется заголовок x-user-id.',
   })
-  myTwoFaMethods(@ReqCtx() ctx: RequestContext): Promise<MyTwoFaMethodDto[]> {
-    return this._userSettings.listMyMethods(ctx.userId as string);
+  myTwoFaMethods(
+    @ReqCtx() ctx: RequestContext,
+    @Args('input', { nullable: true }) input?: MyTwoFaMethodsInput,
+  ): Promise<MyTwoFaMethodDto[]> {
+    return this._userSettings.listMyMethods(
+      ctx.userId as string,
+      input ? dropNulls(input) : {},
+    );
   }
 
   // @UseGuards(AuthedGuard)

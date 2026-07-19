@@ -5,6 +5,7 @@ import {
   ObjectType,
   registerEnumType,
 } from '@nestjs/graphql';
+import { TwoFaManagedBy } from '../../methods/interfaces';
 
 /** Справочник типов доставки кода (сид SeedDictionaries). */
 export enum TwoFaMethodType {
@@ -73,11 +74,7 @@ export class TwoFaMethodsResponse {
   methods?: TwoFaMethodDto[] | null;
 }
 
-/** Чем управляется метод на экране настроек юзера. */
-export enum TwoFaManagedBy {
-  METHOD = 'method',
-  GLOBAL = 'global',
-}
+export { TwoFaManagedBy };
 registerEnumType(TwoFaManagedBy, {
   name: 'TwoFaManagedBy',
   description:
@@ -122,7 +119,45 @@ export class MyTwoFaMethodDto {
       'METHOD — переключается updateMyTwoFaMethod; GLOBAL — общим ' +
       'переключателем updateMyTwoFaDefaults',
   })
-  managedBy: 'method' | 'global';
+  managedBy: TwoFaManagedBy;
+}
+
+@InputType({
+  description:
+    'Фильтры myTwoFaMethods; все опциональны, без них — весь список. ' +
+    'Массивные фильтры (tags, allowedTypes, enabledTypes) — метод должен ' +
+    'содержать ВСЕ запрошенные значения; managedBy — любой из списка.',
+})
+export class MyTwoFaMethodsInput {
+  @Field(() => [TwoFaManagedBy], {
+    nullable: true,
+    description: 'Только методы с одним из способов управления',
+  })
+  managedBy?: TwoFaManagedBy[];
+
+  @Field({
+    nullable: true,
+    description: 'true — только с включённой 2ФА, false — только выключенные',
+  })
+  isEnabled?: boolean;
+
+  @Field(() => [TwoFaMethodTag], {
+    nullable: true,
+    description: 'Метод содержит все перечисленные теги',
+  })
+  tags?: TwoFaMethodTag[];
+
+  @Field(() => [TwoFaMethodType], {
+    nullable: true,
+    description: 'Админский набор типов содержит все перечисленные',
+  })
+  allowedTypes?: TwoFaMethodType[];
+
+  @Field(() => [TwoFaMethodType], {
+    nullable: true,
+    description: 'Действующие типы содержат все перечисленные',
+  })
+  enabledTypes?: TwoFaMethodType[];
 }
 
 @ObjectType('MyTwoFaSettings', {

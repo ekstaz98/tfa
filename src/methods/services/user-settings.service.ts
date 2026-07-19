@@ -16,7 +16,9 @@ import { TAG_SYSTEM, TAG_USER, TOTP_TYPE } from '../constants';
 import {
   MethodView,
   MyMethodView,
+  MyMethodsFilter,
   MyTwoFaSettingsView,
+  TwoFaManagedBy,
   UpdateMyMethodInput,
 } from '../interfaces';
 
@@ -74,9 +76,13 @@ export class UserSettingsService {
    * user/default), включая выключенные и с нулём эффективных типов —
    * twoFaMethods такие не показывает, а экрану настроек нужны и id для
    * повторного включения, и allowedTypes для выбора.
-   * isEnabled = метод реально требует 2ФА.
+   * isEnabled = метод реально требует 2ФА. filter — опциональное сужение
+   * выдачи (см. MyMethodsFilter), без него отдаётся весь список.
    */
-  async listMyMethods(coreUserId: string): Promise<MyMethodView[]> {
+  async listMyMethods(
+    coreUserId: string,
+    filter: MyMethodsFilter = {},
+  ): Promise<MyMethodView[]> {
     const user = await this._requireUser(coreUserId);
     const { tagNameById, activeTypeNameById } =
       await this._dictionaryCache.get();
@@ -120,8 +126,8 @@ export class UserSettingsService {
         continue;
       }
       const managedBy = tagNames.includes(TAG_USER)
-        ? ('method' as const)
-        : ('global' as const);
+        ? TwoFaManagedBy.METHOD
+        : TwoFaManagedBy.GLOBAL;
       const allowedTypes = typeRows
         .filter((row) => row.methodId === method.id)
         .map((row) => activeTypeNameById.get(row.typeId))
@@ -143,7 +149,7 @@ export class UserSettingsService {
         enabledTypes = [];
       }
 
-      views.push({
+      const view: MyMethodView = {
         id: method.id,
         method: method.method,
         isEnabled: enabledTypes.length > 0,
@@ -151,9 +157,37 @@ export class UserSettingsService {
         enabledTypes,
         tags: [...tagNames].sort(),
         managedBy,
-      });
+      };
+      if (this._matchesFilter(view, filter)) {
+        views.push(view);
+      }
     }
     return views;
+  }
+
+  private _matchesFilter(view: MyMethodView, filter: MyMethodsFilter): boolean {
+    if (filter.managedBy && !filter.managedBy.includes(view.managedBy)) {
+      return false;
+    }
+    if (filter.isEnabled !== undefined && view.isEnabled !== filter.isEnabled) {
+      return false;
+    }
+    if (filter.tags && !filter.tags.every((tag) => view.tags.includes(tag))) {
+      return false;
+    }
+    if (
+      filter.allowedTypes &&
+      !filter.allowedTypes.every((type) => view.allowedTypes.includes(type))
+    ) {
+      return false;
+    }
+    if (
+      filter.enabledTypes &&
+      !filter.enabledTypes.every((type) => view.enabledTypes.includes(type))
+    ) {
+      return false;
+    }
+    return true;
   }
 
   /** Query myTwoFaSettings: общий переключатель default-методов. */

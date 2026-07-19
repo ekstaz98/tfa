@@ -33,6 +33,12 @@ export interface UpdateMyMethodInput {
   types?: string[];
 }
 
+/** Чем управляется метод на экране настроек юзера. */
+export enum TwoFaManagedBy {
+  METHOD = 'method',
+  GLOBAL = 'global',
+}
+
 /**
  * Элемент ответа myTwoFaMethods — настройки юзера по user/default-методу.
  * В отличие от MethodView, выключенные методы не выпадают из списка.
@@ -48,11 +54,24 @@ export interface MyMethodView {
   enabledTypes: string[];
   tags: string[];
   /**
-   * Чем управляется метод: method — индивидуальный выключатель
-   * (updateMyTwoFaMethod), global — общий переключатель default-методов
+   * Чем управляется метод: METHOD — индивидуальный выключатель
+   * (updateMyTwoFaMethod), GLOBAL — общий переключатель default-методов
    * (updateMyTwoFaDefaults).
    */
-  managedBy: 'method' | 'global';
+  managedBy: TwoFaManagedBy;
+}
+
+/**
+ * Фильтры myTwoFaMethods; каждый опционален, без фильтров — весь список.
+ * Массивные фильтры по tags/типам — «содержит все запрошенные» (как
+ * tags в twoFaMethods); managedBy — вхождение в список.
+ */
+export interface MyMethodsFilter {
+  managedBy?: TwoFaManagedBy[];
+  isEnabled?: boolean;
+  tags?: string[];
+  allowedTypes?: string[];
+  enabledTypes?: string[];
 }
 
 /** Ответ myTwoFaSettings / updateMyTwoFaDefaults. */

@@ -71,11 +71,14 @@ npm run migration:revert
 - `Query twoFaMethods(input: { hash, tags })` — эффективный список для
   клиента: только методы, реально требующие 2ФА для актора; hash совпал →
   `{ upToDate: true, methods: null }`;
-- `Query myTwoFaMethods` — экран настроек юзера (заголовок `x-user-id`):
-  все методы с тегами `user`/`default`, включая выключенные; на каждый —
+- `Query myTwoFaMethods(input: { managedBy, isEnabled, tags, allowedTypes,
+  enabledTypes })` — экран настроек юзера (заголовок `x-user-id`): все
+  методы с тегами `user`/`default`, включая выключенные; на каждый —
   `allowedTypes` (набор админа), `enabledTypes` (действующие сейчас;
   пусто = 2ФА выключена), `isEnabled` и `managedBy` (`METHOD` —
-  индивидуальный выключатель, `GLOBAL` — общий переключатель);
+  индивидуальный выключатель, `GLOBAL` — общий переключатель). `input`
+  опционален: массивные фильтры — «содержит все перечисленные»,
+  `managedBy` — любой из списка;
 - `Query myTwoFaSettings` / `Mutation updateMyTwoFaDefaults(input:
   { isEnabled })` — общий переключатель юзера: гасит/включает 2ФА разом
   на всех методах режима `default`; `user`- и `system`-методы не

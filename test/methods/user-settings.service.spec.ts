@@ -11,6 +11,7 @@ import {
 } from '../../src/database/entities';
 import { TwoFaError } from '../../src/errors';
 import { UserSettingsService } from '../../src/methods/services';
+import { TwoFaManagedBy } from '../../src/methods/interfaces';
 import {
   FakeCrud,
   fakeDataSource,
@@ -354,6 +355,75 @@ describe('UserSettingsService.updateMyMethods', () => {
 
     it('несинхронизированный юзер → UNKNOWN_IDENTITY-015', () =>
       expectCode(service.listMyMethods('ghost'), 'UNKNOWN_IDENTITY-015'));
+
+    describe('фильтры', () => {
+      beforeEach(async () => {
+        // signin (user, email) выключен юзером; plain (default, sms) включён
+        const signin = methodsCrud.seed({
+          method: 'signin',
+        } as Partial<Method>);
+        methodTypesCrud.seed({ methodId: signin.id, typeId: 'type-email' });
+        methodTagsCrud.seed({ methodId: signin.id, tagId: 'tag-user' });
+        methodTagsCrud.seed({ methodId: signin.id, tagId: 'tag-unauthed' });
+        await service.updateMyMethods(CORE_USER_ID, [
+          { id: signin.id, isActive: false, types: [] },
+        ]);
+        const plain = methodsCrud.seed({ method: 'plain' } as Partial<Method>);
+        methodTagsCrud.seed({ methodId: plain.id, tagId: 'tag-default' });
+        methodTypesCrud.seed({ methodId: plain.id, typeId: 'type-sms' });
+      });
+
+      it('managedBy: только global', async () => {
+        const views = await service.listMyMethods(CORE_USER_ID, {
+          managedBy: [TwoFaManagedBy.GLOBAL],
+        });
+        expect(views.map((view) => view.method)).toEqual(['plain']);
+      });
+
+      it('isEnabled: false — только выключенные', async () => {
+        const views = await service.listMyMethods(CORE_USER_ID, {
+          isEnabled: false,
+        });
+        expect(views.map((view) => view.method)).toEqual(['signin']);
+      });
+
+      it('tags: метод должен содержать все запрошенные', async () => {
+        const views = await service.listMyMethods(CORE_USER_ID, {
+          tags: ['user', 'unauthed'],
+        });
+        expect(views.map((view) => view.method)).toEqual(['signin']);
+      });
+
+      it('allowedTypes / enabledTypes: подмножество набора', async () => {
+        const byAllowed = await service.listMyMethods(CORE_USER_ID, {
+          allowedTypes: ['sms', 'email'],
+        });
+        expect(byAllowed.map((view) => view.method)).toEqual(['transfer']);
+
+        // у signin email разрешён, но выключен — enabledTypes его не содержит
+        const byEnabled = await service.listMyMethods(CORE_USER_ID, {
+          enabledTypes: ['email'],
+        });
+        expect(byEnabled.map((view) => view.method)).toEqual(['transfer']);
+      });
+
+      it('комбинация фильтров сужает до пересечения', async () => {
+        const views = await service.listMyMethods(CORE_USER_ID, {
+          managedBy: [TwoFaManagedBy.METHOD],
+          isEnabled: true,
+        });
+        expect(views.map((view) => view.method)).toEqual(['transfer']);
+      });
+
+      it('пустой фильтр — весь список', async () => {
+        const views = await service.listMyMethods(CORE_USER_ID, {});
+        expect(views.map((view) => view.method).sort()).toEqual([
+          'plain',
+          'signin',
+          'transfer',
+        ]);
+      });
+    });
   });
 
   describe('getMySettings / updateMyDefaults (общий переключатель)', () => {

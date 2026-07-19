@@ -55,6 +55,26 @@ type MyTwoFaMethod {
   tags: [String!]!
 }
 
+"""
+Фильтры myTwoFaMethods; все опциональны, без них — весь список. Массивные фильтры (tags, allowedTypes, enabledTypes) — метод должен содержать ВСЕ запрошенные значения; managedBy — любой из списка.
+"""
+input MyTwoFaMethodsInput {
+  """Админский набор типов содержит все перечисленные"""
+  allowedTypes: [TwoFaMethodType!]
+
+  """Действующие типы содержат все перечисленные"""
+  enabledTypes: [TwoFaMethodType!]
+
+  """true — только с включённой 2ФА, false — только выключенные"""
+  isEnabled: Boolean
+
+  """Только методы с одним из способов управления"""
+  managedBy: [TwoFaManagedBy!]
+
+  """Метод содержит все перечисленные теги"""
+  tags: [TwoFaMethodTag!]
+}
+
 """Настройки 2ФА юзера уровня аккаунта."""
 type MyTwoFaSettings {
   """
@@ -65,9 +85,9 @@ type MyTwoFaSettings {
 
 type Query {
   """
-  Все методы, настраиваемые юзером (теги user и default), включая выключенные. Для каждого — allowedTypes (набор админа), enabledTypes (действующие для юзера), isEnabled и managedBy (METHOD — updateMyTwoFaMethod, GLOBAL — updateMyTwoFaDefaults). Требуется заголовок x-user-id.
+  Все методы, настраиваемые юзером (теги user и default), включая выключенные. Для каждого — allowedTypes (набор админа), enabledTypes (действующие для юзера), isEnabled и managedBy (METHOD — updateMyTwoFaMethod, GLOBAL — updateMyTwoFaDefaults). input — опциональные фильтры выдачи. Требуется заголовок x-user-id.
   """
-  myTwoFaMethods: [MyTwoFaMethod!]!
+  myTwoFaMethods(input: MyTwoFaMethodsInput): [MyTwoFaMethod!]!
 
   """
   Настройки 2ФА уровня аккаунта: общий переключатель default-методов. Требуется заголовок x-user-id.

@@ -649,5 +649,43 @@ describe('2FA API (e2e)', () => {
       );
       expect(required.data!.verifyTwoFa.required).toBe(true);
     });
+
+    it('фильтры myTwoFaMethods: managedBy, isEnabled, tags', async () => {
+      // состояние: transfer/signin (user, вкл), withdraw (default, вкл)
+      const globalOnly = await gql(
+        `{ myTwoFaMethods(input: { managedBy: [GLOBAL] }) { method } }`,
+        undefined,
+        AUTHED,
+      );
+      expect(
+        (globalOnly.data!.myTwoFaMethods as Array<{ method: string }>).map(
+          (view) => view.method,
+        ),
+      ).toEqual(['withdraw']);
+
+      const enabledUserTagged = await gql(
+        `query($input: MyTwoFaMethodsInput) {
+          myTwoFaMethods(input: $input) { method }
+        }`,
+        { input: { isEnabled: true, tags: ['USER'] } },
+        AUTHED,
+      );
+      expect(
+        (enabledUserTagged.data!.myTwoFaMethods as Array<{ method: string }>)
+          .map((view) => view.method)
+          .sort(),
+      ).toEqual(['signin', 'transfer']);
+
+      const bySmsAllowed = await gql(
+        `{ myTwoFaMethods(input: { allowedTypes: [SMS, EMAIL] }) { method } }`,
+        undefined,
+        AUTHED,
+      );
+      expect(
+        (bySmsAllowed.data!.myTwoFaMethods as Array<{ method: string }>).map(
+          (view) => view.method,
+        ),
+      ).toEqual(['transfer']);
+    });
   });
 });
