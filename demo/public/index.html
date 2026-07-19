@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2FA demo</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --line:#e3e5e9; --text:#1c1e22; --muted:#70747c; --accent:#2554d8; --ok:#177245; --err:#b3261e; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 -apple-system,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:12px; padding:12px 20px; background:var(--card); border-bottom:1px solid var(--line); position:sticky; top:0; }
+  header h1 { font-size:16px; margin:0 auto 0 0; }
+  main { display:grid; grid-template-columns: 1fr 340px; gap:16px; padding:16px 20px; max-width:1200px; margin:0 auto; }
+  section.card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  h2 { font-size:15px; margin:0 0 10px; }
+  label { display:block; margin:8px 0 2px; color:var(--muted); font-size:12px; }
+  input { width:100%; max-width:320px; padding:7px 10px; border:1px solid var(--line); border-radius:7px; font:inherit; }
+  button { padding:7px 14px; border:1px solid var(--line); border-radius:7px; background:var(--card); font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+  .msg { margin-top:10px; font-size:13px; white-space:pre-wrap; }
+  .msg.ok { color:var(--ok); } .msg.err { color:var(--err); }
+  .badge { display:inline-block; padding:1px 8px; border-radius:99px; font-size:11px; border:1px solid var(--line); color:var(--muted); }
+  .badge.on { color:var(--ok); border-color:var(--ok); }
+  .badge.off { color:var(--err); border-color:var(--err); }
+  .method { border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-top:8px; }
+  .method b { font-family:ui-monospace,monospace; }
+  .types { display:flex; gap:10px; margin-top:6px; flex-wrap:wrap; }
+  .inboxItem { border-bottom:1px dashed var(--line); padding:8px 0; font-size:13px; }
+  .inboxItem code { font-size:16px; letter-spacing:2px; }
+  .hint { color:var(--muted); font-size:12px; }
+  #log { font:11px/1.5 ui-monospace,monospace; background:#14161a; color:#c8d0dc; border-radius:8px; padding:10px; max-height:220px; overflow:auto; white-space:pre-wrap; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Демо 2ФА-сервиса</h1>
+  <span id="who" class="badge">аноним</span>
+  <button id="seedBtn" title="createTwoFaMethod: signup/signin/transfer">Настроить методы (админ)</button>
+  <button id="logoutBtn" class="hidden">Выйти</button>
+</header>
+<main>
+<div>
+  <section class="card" id="registerCard">
+    <h2>Регистрация <span class="hint">(signup — system + unauthed, код на SMS)</span></h2>
+    <label>Телефон</label><input id="regPhone" value="+7 912 000-11-22">
+    <label>Email</label><input id="regEmail" value="demo@example.com">
+    <div class="row">
+      <button class="primary" id="regSendBtn">Получить код</button>
+      <input id="regCode" placeholder="код из SMS" style="max-width:140px" class="hidden">
+      <button id="regVerifyBtn" class="hidden">Подтвердить</button>
+    </div>
+    <div class="msg" id="regMsg"></div>
+  </section>
+
+  <section class="card" id="loginCard">
+    <h2>Вход <span class="hint">(signin — unauthed + user, код на email)</span></h2>
+    <label>Email или телефон</label><input id="loginIdentity" value="demo@example.com">
+    <div class="row">
+      <button class="primary" id="loginSendBtn">Получить код</button>
+      <input id="loginCode" placeholder="код из письма" style="max-width:140px" class="hidden">
+      <button id="loginVerifyBtn" class="hidden">Войти</button>
+    </div>
+    <div class="msg" id="loginMsg"></div>
+  </section>
+
+  <section class="card hidden" id="cabinetCard">
+    <h2>Личный кабинет — настройки 2ФА</h2>
+    <div class="row">
+      <span>Общий переключатель (default-методы):</span>
+      <span id="globalBadge" class="badge">…</span>
+      <button id="globalToggleBtn">переключить</button>
+    </div>
+    <div id="myMethods"></div>
+    <h2 style="margin-top:16px">Что требует 2ФА сейчас (twoFaMethods)</h2>
+    <div id="effective" class="hint"></div>
+  </section>
+
+  <section class="card hidden" id="txCard">
+    <h2>Моковая транзакция <span class="hint">(transfer — user)</span></h2>
+    <div class="row"><button class="primary" id="txBtn">Перевести 100 ₽</button></div>
+    <div id="txCodes"></div>
+    <div class="row hidden" id="txActions">
+      <button class="primary" id="txVerifyBtn">Подтвердить перевод</button>
+      <button id="txResendBtn">Переотправить коды</button>
+    </div>
+    <div class="msg" id="txMsg"></div>
+  </section>
+</div>
+
+<div>
+  <section class="card">
+    <h2>Входящие SMS / письма <span class="hint">(очередь отправки)</span></h2>
+    <div id="inbox" class="hint">пусто</div>
+  </section>
+  <section class="card">
+    <h2>Последний ответ сервиса</h2>
+    <div id="log">—</div>
+  </section>
+</div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const show = (el, on = true) => el.classList.toggle('hidden', !on);
+const msg = (el, text, ok) => { el.textContent = text; el.className = 'msg ' + (ok ? 'ok' : 'err'); };
+
+async function gql(query, variables, options = {}) {
+  const response = await fetch('/api/gql', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ query, variables, ...options }),
+  });
+  const body = await response.json();
+  $('log').textContent = JSON.stringify(body, null, 2);
+  return body;
+}
+const errText = (body) => body.errors.map((e) => `${e.code ?? ''} ${e.message}`).join('; ');
+
+// ---------- сессия ----------
+let userId = null;
+async function refreshSession() {
+  userId = (await (await fetch('/api/session')).json()).userId;
+  $('who').textContent = userId ? `userId: ${userId.slice(0, 8)}…` : 'аноним';
+  show($('logoutBtn'), !!userId);
+  show($('cabinetCard'), !!userId);
+  show($('txCard'), !!userId);
+  if (userId) await refreshCabinet();
+}
+$('logoutBtn').onclick = async () => { await fetch('/api/session', { method: 'DELETE' }); refreshSession(); };
+
+// ---------- сид методов ----------
+$('seedBtn').onclick = async () => {
+  const body = await gql(`mutation($input: CreateMethodsInput!) {
+      createTwoFaMethod(input: $input) { id method } }`,
+    { input: { methods: [
+      { method: 'signup', types: ['SMS'], tags: ['SYSTEM', 'UNAUTHED'] },
+      { method: 'signin', types: ['EMAIL'], tags: ['UNAUTHED', 'USER'] },
+      { method: 'transfer', types: ['SMS', 'EMAIL'], tags: ['USER'] },
+    ] } }, { role: 'admin' });
+  alert(body.errors ? `Методы уже настроены или ошибка: ${errText(body)}` : 'Методы созданы: signup, signin, transfer');
+};
+
+// ---------- входящие ----------
+setInterval(async () => {
+  const inbox = await (await fetch('/api/inbox')).json();
+  $('inbox').innerHTML = inbox.length === 0 ? 'пусто' : inbox.map((m) => `
+    <div class="inboxItem">[${m.provider}] → ${m.address}<br>код: <code>${m.code}</code>
+    <span class="hint">оп. ${m.operationId.slice(0, 8)}…</span></div>`).join('');
+}, 1500);
+
+// ---------- регистрация ----------
+let regOperationId = null;
+$('regSendBtn').onclick = async () => {
+  const body = await gql(`mutation($input: SendTwoFaInput!) {
+      sendTwoFa(input: $input) { operationId types { type identity expire } } }`,
+    { input: { method: 'signup', identity: $('regPhone').value } }, { anon: true });
+  if (body.errors) return msg($('regMsg'), errText(body), false);
+  regOperationId = body.data.sendTwoFa.operationId;
+  show($('regCode')); show($('regVerifyBtn'));
+  msg($('regMsg'), `SMS отправлена на ${body.data.sendTwoFa.types[0].identity} — код во «входящих» справа`, true);
+};
+$('regVerifyBtn').onclick = async () => {
+  const body = await gql(`mutation($input: VerifyTwoFaInput!) {
+      verifyTwoFa(input: $input) { verified identity } }`,
+    { input: { operationId: regOperationId, method: 'signup',
+      codes: [{ type: 'SMS', code: $('regCode').value.trim() }] } },
+    { role: 'service', anon: true });
+  if (body.errors) return msg($('regMsg'), errText(body), false);
+  // канал подтверждён — «core» создаёт юзера и шлёт user.sync
+  const created = await (await fetch('/api/core/users', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ credentials: [
+      { type: 'sms', identity: body.data.verifyTwoFa.identity },
+      { type: 'email', identity: $('regEmail').value },
+    ] }),
+  })).json();
+  msg($('regMsg'), `Готово! Юзер создан в core (${created.userId.slice(0, 8)}…) и синхронизирован. Теперь войдите.`, true);
+};
+
+// ---------- вход ----------
+let loginOperationId = null;
+$('loginSendBtn').onclick = async () => {
+  const identity = $('loginIdentity').value;
+  const body = await gql(`mutation($input: SendTwoFaInput!) {
+      sendTwoFa(input: $input) { operationId types { type identity } } }`,
+    { input: { method: 'signin', identity } }, { anon: true });
+  if (body.errors) return msg($('loginMsg'), errText(body), false);
+  loginOperationId = body.data.sendTwoFa.operationId;
+  show($('loginCode')); show($('loginVerifyBtn'));
+  msg($('loginMsg'), `Код отправлен: ${body.data.sendTwoFa.types.map((t) => `${t.type} → ${t.identity}`).join(', ')}`, true);
+};
+$('loginVerifyBtn').onclick = async () => {
+  const body = await gql(`mutation($input: VerifyTwoFaInput!) {
+      verifyTwoFa(input: $input) { verified userId } }`,
+    { input: { operationId: loginOperationId, method: 'signin', identity: $('loginIdentity').value,
+      codes: [{ type: 'EMAIL', code: $('loginCode').value.trim() }] } },
+    { role: 'service', anon: true });
+  if (body.errors) return msg($('loginMsg'), errText(body), false);
+  await fetch('/api/session', { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ userId: body.data.verifyTwoFa.userId }) });
+  msg($('loginMsg'), 'Вход выполнен', true);
+  refreshSession();
+};
+
+// ---------- кабинет ----------
+async function refreshCabinet() {
+  const settings = await gql(`{ myTwoFaSettings { defaultMethodsEnabled } }`);
+  if (!settings.errors) {
+    const on = settings.data.myTwoFaSettings.defaultMethodsEnabled;
+    $('globalBadge').textContent = on ? 'включён' : 'выключен';
+    $('globalBadge').className = 'badge ' + (on ? 'on' : 'off');
+  }
+  const mine = await gql(`{ myTwoFaMethods {
+    id method isEnabled allowedTypes enabledTypes managedBy } }`);
+  if (!mine.errors) {
+    $('myMethods').innerHTML = mine.data.myTwoFaMethods.map((m) => `
+      <div class="method">
+        <b>${m.method}</b>
+        <span class="badge ${m.isEnabled ? 'on' : 'off'}">${m.isEnabled ? '2ФА включена' : '2ФА выключена'}</span>
+        <span class="badge">${m.managedBy === 'GLOBAL' ? 'общий переключатель' : 'индивидуально'}</span>
+        ${m.managedBy === 'METHOD' ? `
+          <div class="types">${m.allowedTypes.map((t) => `
+            <label style="display:inline"><input type="checkbox" data-method="${m.id}" value="${t}"
+              ${m.enabledTypes.includes(t) ? 'checked' : ''}> ${t}</label>`).join('')}
+            <button data-apply="${m.id}">Применить</button>
+            <button data-toggle="${m.id}" data-next="${!m.isEnabled}">${m.isEnabled ? 'Выключить' : 'Включить'}</button>
+          </div>` : ''}
+      </div>`).join('');
+  }
+  const effective = await gql(`{ twoFaMethods { methods { method types } } }`);
+  if (!effective.errors) {
+    const list = effective.data.twoFaMethods.methods;
+    $('effective').textContent = list.length
+      ? list.map((m) => `${m.method} [${m.types.join(', ')}]`).join('  ·  ')
+      : 'ничего — 2ФА нигде не требуется';
+  }
+}
+$('globalToggleBtn').onclick = async () => {
+  const on = $('globalBadge').textContent === 'включён';
+  await gql(`mutation($input: UpdateMyTwoFaDefaultsInput!) {
+      updateMyTwoFaDefaults(input: $input) { defaultMethodsEnabled } }`,
+    { input: { isEnabled: !on } });
+  refreshCabinet();
+};
+$('myMethods').onclick = async (event) => {
+  const applyId = event.target.dataset?.apply;
+  const toggleId = event.target.dataset?.toggle;
+  if (applyId) {
+    const types = [...document.querySelectorAll(`input[data-method="${applyId}"]:checked`)]
+      .map((el) => el.value.toUpperCase());
+    const body = await gql(`mutation($input: UpdateMyMethodsInput!) {
+        updateMyTwoFaMethod(input: $input) { id } }`,
+      { input: { methods: [{ id: applyId, isActive: types.length > 0, types } ] } });
+    if (body.errors) alert(errText(body));
+    refreshCabinet();
+  }
+  if (toggleId) {
+    const enable = event.target.dataset.next === 'true';
+    const allowed = [...document.querySelectorAll(`input[data-method="${toggleId}"]`)]
+      .map((el) => el.value.toUpperCase());
+    const body = await gql(`mutation($input: UpdateMyMethodsInput!) {
+        updateMyTwoFaMethod(input: $input) { id } }`,
+      { input: { methods: [{ id: toggleId, isActive: enable, types: enable ? allowed : [] }] } });
+    if (body.errors) alert(errText(body));
+    refreshCabinet();
+  }
+};
+
+// ---------- транзакция ----------
+let txOperationId = null;
+let txTypes = [];
+$('txBtn').onclick = async () => {
+  $('txCodes').innerHTML = ''; show($('txActions'), false); $('txMsg').textContent = '';
+  // гейтвей: нужна ли 2ФА?
+  const required = await gql(`mutation($input: VerifyTwoFaInput!) {
+      verifyTwoFa(input: $input) { required } }`,
+    { input: { method: 'transfer', userId } }, { role: 'service' });
+  if (required.errors) return msg($('txMsg'), errText(required), false);
+  if (!required.data.verifyTwoFa.required) {
+    return msg($('txMsg'), 'Перевод выполнен БЕЗ 2ФА (метод не покрыт для вас)', true);
+  }
+  const body = await gql(`mutation($input: SendTwoFaInput!) {
+      sendTwoFa(input: $input) { operationId types { type identity expire retry } } }`,
+    { input: { method: 'transfer' } });
+  if (body.errors) return msg($('txMsg'), errText(body), false);
+  txOperationId = body.data.sendTwoFa.operationId;
+  txTypes = body.data.sendTwoFa.types;
+  $('txCodes').innerHTML = txTypes.map((t) => `
+    <label>Код ${t.type} → ${t.identity ?? 'из приложения'} <span class="hint">(истекает через ${t.expire} с)</span></label>
+    <input data-txtype="${t.type}" placeholder="код" style="max-width:140px">`).join('');
+  show($('txActions'));
+  msg($('txMsg'), 'Требуется 2ФА: введите коды из «входящих»', true);
+};
+$('txResendBtn').onclick = async () => {
+  const body = await gql(`mutation($input: SendTwoFaInput!) {
+      sendTwoFa(input: $input) { operationId types { type retry } } }`,
+    { input: { method: 'transfer' } }, { operationId: txOperationId });
+  msg($('txMsg'), body.errors ? errText(body) : 'Коды переотправлены', !body.errors);
+};
+$('txVerifyBtn').onclick = async () => {
+  const codes = [...document.querySelectorAll('input[data-txtype]')]
+    .map((el) => ({ type: el.dataset.txtype.toUpperCase(), code: el.value.trim() }));
+  const body = await gql(`mutation($input: VerifyTwoFaInput!) {
+      verifyTwoFa(input: $input) { verified } }`,
+    { input: { operationId: txOperationId, method: 'transfer', userId, codes } },
+    { role: 'service' });
+  if (body.errors) return msg($('txMsg'), errText(body), false);
+  show($('txActions'), false); $('txCodes').innerHTML = '';
+  msg($('txMsg'), '✓ Перевод 100 ₽ выполнен — операция верифицирована', true);
+};
+
+refreshSession();
+</script>
+</body>
+</html>

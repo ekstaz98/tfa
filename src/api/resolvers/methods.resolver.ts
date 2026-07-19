@@ -75,7 +75,8 @@ export class MethodsResolver {
     name: 'myTwoFaMethods',
     description:
       'Все методы, настраиваемые юзером (теги user и default), включая ' +
-      'выключенные. Для каждого — allowedTypes (набор админа), enabledTypes ' +
+      'выключенные юзером. Методы без настроенных админом типов не ' +
+      'показываются. Для каждого — allowedTypes (набор админа), enabledTypes ' +
       '(действующие для юзера), isEnabled и managedBy (METHOD — ' +
       'updateMyTwoFaMethod, GLOBAL — updateMyTwoFaDefaults). ' +
       'input — опциональные фильтры выдачи. Требуется заголовок x-user-id.',

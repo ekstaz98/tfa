@@ -336,6 +336,19 @@ describe('UserSettingsService.updateMyMethods', () => {
       });
     });
 
+    it('метод без настроенных типов (свежий автосинк) не попадает', async () => {
+      const draft = methodsCrud.seed({ method: 'draft' } as Partial<Method>);
+      methodTagsCrud.seed({ methodId: draft.id, tagId: 'tag-user' });
+      const draftDefault = methodsCrud.seed({
+        method: 'draft-default',
+      } as Partial<Method>);
+      methodTagsCrud.seed({ methodId: draftDefault.id, tagId: 'tag-default' });
+
+      const views = await service.listMyMethods(CORE_USER_ID);
+
+      expect(views.map((view) => view.method)).toEqual(['transfer']);
+    });
+
     it('выключенный/удалённый админом метод не попадает', async () => {
       const off = methodsCrud.seed({
         method: 'off',

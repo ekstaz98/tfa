@@ -34,4 +34,38 @@ describe('CodeGeneratorService', () => {
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
     expect(service.matches('123456', hash)).toBe(false);
   });
+
+  describe('дев-режим статичных кодов (CODE_STATIC_ENABLED)', () => {
+    const staticService = new CodeGeneratorService(
+      fakeConfig({
+        'codes.hmacSecret': 's'.repeat(32),
+        'codes.length': 6,
+        'codes.staticEnabled': true,
+      }),
+    );
+
+    it('generate всегда возвращает нули по длине кода', () => {
+      expect(staticService.generate()).toBe('000000');
+      expect(staticService.generate()).toBe('000000');
+    });
+
+    it('hash/matches работают со статичным кодом штатно', () => {
+      const hash = staticService.hash(staticService.generate());
+      expect(staticService.matches('000000', hash)).toBe(true);
+      expect(staticService.matches('000001', hash)).toBe(false);
+    });
+
+    it('randomHash остаётся случайным — пустышки не принимают нули', () => {
+      expect(staticService.matches('000000', staticService.randomHash())).toBe(
+        false,
+      );
+    });
+
+    it('без флага коды не статичные', () => {
+      const codes = new Set(
+        Array.from({ length: 20 }, () => service.generate()),
+      );
+      expect(codes.size).toBeGreaterThan(1);
+    });
+  });
 });

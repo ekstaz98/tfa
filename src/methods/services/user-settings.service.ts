@@ -73,11 +73,12 @@ export class UserSettingsService {
 
   /**
    * Query myTwoFaMethods: все настраиваемые юзером методы (теги
-   * user/default), включая выключенные и с нулём эффективных типов —
-   * twoFaMethods такие не показывает, а экрану настроек нужны и id для
-   * повторного включения, и allowedTypes для выбора.
-   * isEnabled = метод реально требует 2ФА. filter — опциональное сужение
-   * выдачи (см. MyMethodsFilter), без него отдаётся весь список.
+   * user/default), включая выключенные ЮЗЕРОМ — twoFaMethods такие
+   * не показывает, а экрану настроек нужны и id для повторного включения,
+   * и allowedTypes для выбора. Методы без единого настроенного админом
+   * типа (allowedTypes пуст, свежий автосинк) исключаются — управлять
+   * в них нечем. isEnabled = метод реально требует 2ФА. filter —
+   * опциональное сужение выдачи (см. MyMethodsFilter).
    */
   async listMyMethods(
     coreUserId: string,
@@ -133,6 +134,11 @@ export class UserSettingsService {
         .map((row) => activeTypeNameById.get(row.typeId))
         .filter((name): name is string => name !== undefined)
         .sort();
+      // без настроенных админом типов управлять нечем (свежий автосинк) —
+      // такие методы экран настроек не показывает
+      if (allowedTypes.length === 0) {
+        continue;
+      }
 
       let enabledTypes = allowedTypes;
       if (managedBy === 'method') {

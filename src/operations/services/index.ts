@@ -2,6 +2,7 @@ export * from './code-generator.service';
 export * from './hash-code.verifier';
 export * from './identity.service';
 export * from './mock-code-send-publisher';
+export * from './rmq-code-send-publisher';
 export * from './operation.service';
 export * from './requirement.service';
 export * from './retention.service';

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { CryptoModule } from '../crypto/crypto.module';
 import { DatabaseModule } from '../database/database.module';
 import { MethodsModule } from '../methods/methods.module';
@@ -11,6 +12,7 @@ import {
   MockCodeSendPublisher,
   OperationService,
   RetentionService,
+  RmqCodeSendPublisher,
   TotpVerifier,
   TwoFaRequirementService,
   VerificationService,
@@ -20,10 +22,19 @@ import {
 @Module({
   imports: [DatabaseModule, CryptoModule, MethodsModule],
   providers: [
-    // мок — единственная реализация порта отправки в скелете; живой
-    // адаптер к events-сервису = замена этого провайдера
+    // порт отправки: мок (дефолт, e2e читают коды из него) или живой
+    // RMQ-транспорт — выбор конфигом sendEvent.transport (SEND_TRANSPORT)
     MockCodeSendPublisher,
-    { provide: CODE_SEND_PUBLISHER, useExisting: MockCodeSendPublisher },
+    RmqCodeSendPublisher,
+    {
+      provide: CODE_SEND_PUBLISHER,
+      inject: [ConfigService, MockCodeSendPublisher, RmqCodeSendPublisher],
+      useFactory: (
+        config: ConfigService,
+        mock: MockCodeSendPublisher,
+        rmq: RmqCodeSendPublisher,
+      ) => (config.get<string>('sendEvent.transport') === 'rmq' ? rmq : mock),
+    },
     HashCodeVerifier,
     TotpVerifier,
     VerifierRegistry,

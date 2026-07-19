@@ -41,6 +41,9 @@ npm run start:dev      # GraphQL: http://localhost:3000/graphql
 Опциональные (дефолты): `RMQ_USERS_QUEUE` (tfa-users-sync), `CODE_LENGTH` (6),
 `CODE_TTL_SECONDS` (300 — единый TTL кода и операции), `CODE_RETRY_SECONDS`
 (120), `CODE_ATTEMPTS_LIMIT` (3), `CODE_RESENDS_LIMIT` (3),
+`CODE_STATIC_ENABLED` (`true` — дев-режим: все коды статичные нули,
+`000000` при длине 6; на TOTP и операции-пустышки не влияет — **только
+для дев-стендов**),
 `OPERATIONS_DAILY_LIMIT` (10 — на «актор × метод»), `UNAUTHED_IP_HOURLY_LIMIT`
 (20), `RETENTION_DAYS` (30), `GATEWAY_GRAPHQL_URL` (без него недоступен
 автосинк `updateListMethods`), `SEND_EVENT_NAME` (TFA_OTP),
@@ -73,7 +76,8 @@ npm run migration:revert
   `{ upToDate: true, methods: null }`;
 - `Query myTwoFaMethods(input: { managedBy, isEnabled, tags, allowedTypes,
   enabledTypes })` — экран настроек юзера (заголовок `x-user-id`): все
-  методы с тегами `user`/`default`, включая выключенные; на каждый —
+  методы с тегами `user`/`default`, включая выключенные юзером (методы
+  без настроенных админом типов не показываются); на каждый —
   `allowedTypes` (набор админа), `enabledTypes` (действующие сейчас;
   пусто = 2ФА выключена), `isEnabled` и `managedBy` (`METHOD` —
   индивидуальный выключатель, `GLOBAL` — общий переключатель). `input`
@@ -186,6 +190,25 @@ providerName события задаётся в `SEND_PROVIDER_MAP`. Типу с
 управляет каждым методом индивидуально через `updateMyTwoFaMethod`;
 `unauthed` — доступен без токена; `system + unauthed` = регистрационный
 (код уходит на незнакомый identity).
+
+## Демо-фронт
+
+`demo/` — одностраничный стенд, демонстрирующий полный цикл: регистрация
+(signup), вход по identity (signin), личный кабинет (myTwoFaMethods,
+общий переключатель, индивидуальные настройки) и моковая транзакция
+(transfer c кодами). Демо-сервер играет гейтвей (проставляет заголовки),
+core-систему (публикует `user.sync`) и каналы доставки (читает очередь
+событий отправки и показывает коды как «входящие»).
+
+```bash
+SEND_TRANSPORT=rmq npm run start   # сервис: коды уходят в RMQ-очередь
+node demo/server.js                # http://localhost:4444
+```
+
+Порт отправки кодов выбирается конфигом `SEND_TRANSPORT`: `mock`
+(по умолчанию, события в памяти — их читают e2e) или `rmq` — публикация
+в очередь `SEND_EVENTS_QUEUE` (дефолт `tfa-send-events`) через
+`RmqCodeSendPublisher`.
 
 ## Тесты
 

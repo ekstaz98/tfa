@@ -22,6 +22,11 @@ export interface AppConfig {
     attemptsLimit: number;
     /** Лимит переотправок кода на тип в рамках операции. */
     resendsLimit: number;
+    /**
+     * Дев-режим: все коды — статичные нули (000000 при длине 6) вместо
+     * CSPRNG. Только для дев-стендов, в проде включённым быть не должен.
+     */
+    staticEnabled: boolean;
   };
   limits: {
     /** Дневной лимит созданных операций на «актор × метод». */
@@ -52,6 +57,10 @@ export interface AppConfig {
     name: string;
     /** Тип 2ФА -> providerName в destination события отправки. */
     providerByType: Record<string, string>;
+    /** Транспорт порта отправки: mock (по умолчанию) | rmq. */
+    transport: 'mock' | 'rmq';
+    /** Очередь событий отправки при transport = rmq. */
+    queue: string;
   };
 }
 
@@ -72,6 +81,7 @@ export default (): AppConfig => ({
     retrySeconds: Number(process.env.CODE_RETRY_SECONDS ?? 120),
     attemptsLimit: Number(process.env.CODE_ATTEMPTS_LIMIT ?? 3),
     resendsLimit: Number(process.env.CODE_RESENDS_LIMIT ?? 3),
+    staticEnabled: process.env.CODE_STATIC_ENABLED === 'true',
   },
   limits: {
     operationsPerDay: Number(process.env.OPERATIONS_DAILY_LIMIT ?? 10),
@@ -98,5 +108,7 @@ export default (): AppConfig => ({
     providerByType: JSON.parse(
       process.env.SEND_PROVIDER_MAP ?? '{"email":"smtp","sms":"sms"}',
     ) as Record<string, string>,
+    transport: process.env.SEND_TRANSPORT === 'rmq' ? 'rmq' : 'mock',
+    queue: process.env.SEND_EVENTS_QUEUE ?? 'tfa-send-events',
   },
 });

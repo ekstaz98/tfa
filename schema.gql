@@ -85,7 +85,7 @@ type MyTwoFaSettings {
 
 type Query {
   """
-  Все методы, настраиваемые юзером (теги user и default), включая выключенные. Для каждого — allowedTypes (набор админа), enabledTypes (действующие для юзера), isEnabled и managedBy (METHOD — updateMyTwoFaMethod, GLOBAL — updateMyTwoFaDefaults). input — опциональные фильтры выдачи. Требуется заголовок x-user-id.
+  Все методы, настраиваемые юзером (теги user и default), включая выключенные юзером. Методы без настроенных админом типов не показываются. Для каждого — allowedTypes (набор админа), enabledTypes (действующие для юзера), isEnabled и managedBy (METHOD — updateMyTwoFaMethod, GLOBAL — updateMyTwoFaDefaults). input — опциональные фильтры выдачи. Требуется заголовок x-user-id.
   """
   myTwoFaMethods(input: MyTwoFaMethodsInput): [MyTwoFaMethod!]!
 
