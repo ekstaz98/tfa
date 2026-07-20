@@ -30,6 +30,14 @@
   .inboxItem { border-bottom:1px dashed var(--line); padding:8px 0; font-size:13px; }
   .inboxItem code { font-size:16px; letter-spacing:2px; }
   .hint { color:var(--muted); font-size:12px; }
+  h3 { font-size:13px; margin:16px 0 6px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+  .switch { position:relative; display:inline-block; width:40px; height:22px; vertical-align:middle; }
+  .switch input { opacity:0; width:0; height:0; }
+  .slider { position:absolute; inset:0; background:#c8ccd4; border-radius:99px; transition:.15s; cursor:pointer; }
+  .slider::before { content:""; position:absolute; width:16px; height:16px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.15s; }
+  .switch input:checked + .slider { background:var(--ok); }
+  .switch input:checked + .slider::before { transform:translateX(18px); }
+  .methodHead { display:flex; align-items:center; justify-content:space-between; gap:10px; }
   #log { font:11px/1.5 ui-monospace,monospace; background:#14161a; color:#c8d0dc; border-radius:8px; padding:10px; max-height:220px; overflow:auto; white-space:pre-wrap; }
   .hidden { display:none; }
 </style>
@@ -59,7 +67,7 @@
     <h2>Вход <span class="hint">(signin — unauthed + user, код на email)</span></h2>
     <label>Email или телефон</label><input id="loginIdentity" value="demo@example.com">
     <div class="row">
-      <button class="primary" id="loginSendBtn">Получить код</button>
+      <button class="primary" id="loginSendBtn">Продолжить</button>
       <input id="loginCode" placeholder="код из письма" style="max-width:140px" class="hidden">
       <button id="loginVerifyBtn" class="hidden">Войти</button>
     </div>
@@ -68,12 +76,18 @@
 
   <section class="card hidden" id="cabinetCard">
     <h2>Личный кабинет — настройки 2ФА</h2>
-    <div class="row">
-      <span>Общий переключатель (default-методы):</span>
-      <span id="globalBadge" class="badge">…</span>
-      <button id="globalToggleBtn">переключить</button>
-    </div>
-    <div id="myMethods"></div>
+
+    <h3>Мои методы — индивидуальное управление</h3>
+    <div id="myMethods" class="hint">…</div>
+
+    <h3>
+      Стандартные методы — общий переключатель
+      <label class="switch" style="margin-left:8px">
+        <input type="checkbox" id="globalSwitch"><span class="slider"></span>
+      </label>
+    </h3>
+    <div id="globalMethods" class="hint">…</div>
+
     <h2 style="margin-top:16px">Что требует 2ФА сейчас (twoFaMethods)</h2>
     <div id="effective" class="hint"></div>
   </section>
@@ -184,6 +198,22 @@ $('regVerifyBtn').onclick = async () => {
 let loginOperationId = null;
 $('loginSendBtn').onclick = async () => {
   const identity = $('loginIdentity').value;
+  // как гейтвей: сначала «нужна ли 2ФА для этого identity?»
+  const required = await gql(`mutation($input: VerifyTwoFaInput!) {
+      verifyTwoFa(input: $input) { required } }`,
+    { input: { method: 'signin', identity } }, { role: 'service', anon: true });
+  if (required.errors) return msg($('loginMsg'), errText(required), false);
+  if (!required.data.verifyTwoFa.required) {
+    // 2ФА выключена юзером (или метод не покрыт) — core пускает без кода
+    const response = await fetch('/api/login', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ identity }),
+    });
+    const result = await response.json();
+    if (!response.ok) return msg($('loginMsg'), result.error, false);
+    msg($('loginMsg'), 'Вход выполнен БЕЗ 2ФА — метод signin у вас отключён', true);
+    return refreshSession();
+  }
   const body = await gql(`mutation($input: SendTwoFaInput!) {
       sendTwoFa(input: $input) { operationId types { type identity } } }`,
     { input: { method: 'signin', identity } }, { anon: true });
@@ -206,30 +236,57 @@ $('loginVerifyBtn').onclick = async () => {
 };
 
 // ---------- кабинет ----------
+const cabinetMethods = new Map(); // id -> метод из myTwoFaMethods
 async function refreshCabinet() {
   const settings = await gql(`{ myTwoFaSettings { defaultMethodsEnabled } }`);
-  if (!settings.errors) {
-    const on = settings.data.myTwoFaSettings.defaultMethodsEnabled;
-    $('globalBadge').textContent = on ? 'включён' : 'выключен';
-    $('globalBadge').className = 'badge ' + (on ? 'on' : 'off');
-  }
+  const globalOn = settings.errors ? true : settings.data.myTwoFaSettings.defaultMethodsEnabled;
+  $('globalSwitch').checked = globalOn;
+
   const mine = await gql(`{ myTwoFaMethods {
     id method isEnabled allowedTypes enabledTypes managedBy } }`);
   if (!mine.errors) {
-    $('myMethods').innerHTML = mine.data.myTwoFaMethods.map((m) => `
+    cabinetMethods.clear();
+    for (const m of mine.data.myTwoFaMethods) cabinetMethods.set(m.id, m);
+    const list = mine.data.myTwoFaMethods;
+
+    // user-методы: каждый со своим тумблером и выбором каналов
+    const userMethods = list.filter((m) => m.managedBy === 'METHOD');
+    $('myMethods').innerHTML = userMethods.length === 0
+      ? 'нет методов с индивидуальным управлением'
+      : userMethods.map((m) => `
       <div class="method">
-        <b>${m.method}</b>
-        <span class="badge ${m.isEnabled ? 'on' : 'off'}">${m.isEnabled ? '2ФА включена' : '2ФА выключена'}</span>
-        <span class="badge">${m.managedBy === 'GLOBAL' ? 'общий переключатель' : 'индивидуально'}</span>
-        ${m.managedBy === 'METHOD' ? `
-          <div class="types">${m.allowedTypes.map((t) => `
+        <div class="methodHead">
+          <span><b>${m.method}</b>
+            <span class="badge ${m.isEnabled ? 'on' : 'off'}">${m.isEnabled ? '2ФА включена' : '2ФА выключена'}</span>
+          </span>
+          <label class="switch" title="${m.isEnabled ? 'Выключить' : 'Включить (все каналы)'}">
+            <input type="checkbox" data-toggle="${m.id}" ${m.isEnabled ? 'checked' : ''}>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="types">
+          ${m.allowedTypes.map((t) => `
             <label style="display:inline"><input type="checkbox" data-method="${m.id}" value="${t}"
-              ${m.enabledTypes.includes(t) ? 'checked' : ''}> ${t}</label>`).join('')}
-            <button data-apply="${m.id}">Применить</button>
-            <button data-toggle="${m.id}" data-next="${!m.isEnabled}">${m.isEnabled ? 'Выключить' : 'Включить'}</button>
-          </div>` : ''}
+              ${m.enabledTypes.includes(t) ? 'checked' : ''} ${m.isEnabled ? '' : 'disabled'}> ${t}</label>`).join('')}
+          <button data-apply="${m.id}" ${m.isEnabled ? '' : 'disabled'}>Применить каналы</button>
+        </div>
+      </div>`).join('');
+
+    // default-методы: состояние следует за общим тумблером
+    const globalMethods = list.filter((m) => m.managedBy === 'GLOBAL');
+    $('globalMethods').innerHTML = globalMethods.length === 0
+      ? 'нет методов под общим переключателем'
+      : globalMethods.map((m) => `
+      <div class="method">
+        <div class="methodHead">
+          <span><b>${m.method}</b>
+            <span class="hint">каналы: ${m.allowedTypes.join(', ')}</span>
+          </span>
+          <span class="badge ${m.isEnabled ? 'on' : 'off'}">${m.isEnabled ? '2ФА включена' : '2ФА выключена'}</span>
+        </div>
       </div>`).join('');
   }
+
   const effective = await gql(`{ twoFaMethods { methods { method types } } }`);
   if (!effective.errors) {
     const list = effective.data.twoFaMethods.methods;
@@ -238,35 +295,40 @@ async function refreshCabinet() {
       : 'ничего — 2ФА нигде не требуется';
   }
 }
-$('globalToggleBtn').onclick = async () => {
-  const on = $('globalBadge').textContent === 'включён';
-  await gql(`mutation($input: UpdateMyTwoFaDefaultsInput!) {
+
+$('globalSwitch').onchange = async (event) => {
+  const body = await gql(`mutation($input: UpdateMyTwoFaDefaultsInput!) {
       updateMyTwoFaDefaults(input: $input) { defaultMethodsEnabled } }`,
-    { input: { isEnabled: !on } });
+    { input: { isEnabled: event.target.checked } });
+  if (body.errors) alert(errText(body));
   refreshCabinet();
 };
+
+$('myMethods').onchange = async (event) => {
+  const toggleId = event.target.dataset?.toggle;
+  if (!toggleId) return;
+  const enable = event.target.checked;
+  const allowed = (cabinetMethods.get(toggleId)?.allowedTypes ?? []).map((t) => t.toUpperCase());
+  const body = await gql(`mutation($input: UpdateMyMethodsInput!) {
+      updateMyTwoFaMethod(input: $input) { id } }`,
+    { input: { methods: [{ id: toggleId, isActive: enable, types: enable ? allowed : [] }] } });
+  if (body.errors) alert(errText(body));
+  refreshCabinet();
+};
+
 $('myMethods').onclick = async (event) => {
   const applyId = event.target.dataset?.apply;
-  const toggleId = event.target.dataset?.toggle;
-  if (applyId) {
-    const types = [...document.querySelectorAll(`input[data-method="${applyId}"]:checked`)]
-      .map((el) => el.value.toUpperCase());
-    const body = await gql(`mutation($input: UpdateMyMethodsInput!) {
-        updateMyTwoFaMethod(input: $input) { id } }`,
-      { input: { methods: [{ id: applyId, isActive: types.length > 0, types } ] } });
-    if (body.errors) alert(errText(body));
-    refreshCabinet();
+  if (!applyId) return;
+  const types = [...document.querySelectorAll(`input[data-method="${applyId}"]:checked`)]
+    .map((el) => el.value.toUpperCase());
+  if (types.length === 0) {
+    return alert('Выберите хотя бы один канал или выключите метод тумблером');
   }
-  if (toggleId) {
-    const enable = event.target.dataset.next === 'true';
-    const allowed = [...document.querySelectorAll(`input[data-method="${toggleId}"]`)]
-      .map((el) => el.value.toUpperCase());
-    const body = await gql(`mutation($input: UpdateMyMethodsInput!) {
-        updateMyTwoFaMethod(input: $input) { id } }`,
-      { input: { methods: [{ id: toggleId, isActive: enable, types: enable ? allowed : [] }] } });
-    if (body.errors) alert(errText(body));
-    refreshCabinet();
-  }
+  const body = await gql(`mutation($input: UpdateMyMethodsInput!) {
+      updateMyTwoFaMethod(input: $input) { id } }`,
+    { input: { methods: [{ id: applyId, isActive: true, types }] } });
+  if (body.errors) alert(errText(body));
+  refreshCabinet();
 };
 
 // ---------- транзакция ----------

@@ -10,6 +10,7 @@
  * Запуск: сервис с SEND_TRANSPORT=rmq, затем `node demo/server.js`.
  * Env: DEMO_PORT (4444), GQL_URL, RMQ_URL, SEND_EVENTS_QUEUE, RMQ_USERS_QUEUE.
  */
+const fs = require('fs');
 const path = require('path');
 const { randomUUID } = require('crypto');
 const express = require('express');
@@ -29,6 +30,28 @@ app.use(express.static(path.join(__dirname, 'public')));
 const session = { userId: null };
 /** «Входящие» каналов доставки: последние события отправки кодов. */
 const inbox = [];
+
+/**
+ * «Реестр core»: identity -> userId созданных через демо юзеров. Нужен для
+ * входа БЕЗ 2ФА (required: false): сервис в этом случае userId не отдаёт —
+ * резолв юзера по identity в реальной жизни делает core. Персистится в файл,
+ * чтобы переживать рестарты демо-сервера.
+ */
+const USERS_FILE = path.join(__dirname, 'users.json');
+const userByIdentity = new Map(
+  fs.existsSync(USERS_FILE)
+    ? Object.entries(JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')))
+    : [],
+);
+function saveUsers() {
+  fs.writeFileSync(USERS_FILE, JSON.stringify(Object.fromEntries(userByIdentity), null, 2));
+}
+/** Зеркало нормализации сервиса: email → lowercase, phone → E.164. */
+function normalizeIdentity(identity) {
+  const trimmed = String(identity ?? '').trim();
+  if (trimmed.includes('@')) return trimmed.toLowerCase();
+  return `+${trimmed.replace(/\D/g, '')}`;
+}
 
 let usersChannel = null;
 
@@ -107,6 +130,25 @@ app.post('/api/core/users', (req, res) => {
     Buffer.from(JSON.stringify({ pattern: 'user.sync', data: { userId, credentials } })),
     { persistent: true },
   );
+  for (const credential of credentials) {
+    userByIdentity.set(normalizeIdentity(credential.identity), userId);
+  }
+  saveUsers();
+  res.json({ userId });
+});
+
+/**
+ * «Core пустил без 2ФА»: гейтвей получил required: false — пароль проверен
+ * (мок), юзер резолвится по identity из реестра core и логинится без кодов.
+ */
+app.post('/api/login', (req, res) => {
+  const userId = userByIdentity.get(normalizeIdentity(req.body?.identity));
+  if (!userId) {
+    return res.status(404).json({
+      error: 'Юзер не найден в демо-реестре core — зарегистрируйтесь через демо',
+    });
+  }
+  session.userId = userId;
   res.json({ userId });
 });
 
