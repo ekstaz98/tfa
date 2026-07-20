@@ -142,7 +142,7 @@ export class OperationService {
       dummy = true;
       typeNames = await this._methodConfiguredTypes(method.id);
     }
-    // анти-enumeration (signin): неизвестный/неподтверждённый identity → пустышка
+    // анти-enumeration (signIn): неизвестный/неподтверждённый identity → пустышка
     if (!actor.authed && !isRegistration && !actor.user) {
       dummy = true;
     }

@@ -16,6 +16,7 @@ import {
   FakeCrud,
   fakeDataSource,
   fakeDictionaryCache,
+  fakeUserMethodPolicy,
   seedDictionaries,
 } from '../testing/fakes';
 
@@ -85,9 +86,28 @@ describe('UserSettingsService.updateMyMethods', () => {
       methodTypesCrud as any,
       methodTagsCrud as any,
       fakeDictionaryCache(typesCrud, tagsCrud),
+      fakeUserMethodPolicy(), // userMethodsActive: true — тот же opt-out, что и до флага
     );
     /* eslint-enable @typescript-eslint/no-explicit-any */
   });
+
+  /** Тот же сетап, но с opt-in-политикой (USER_METHODS_ACTIVE=false). */
+  function buildOptInService(): UserSettingsService {
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    return new UserSettingsService(
+      fakeDataSource(),
+      usersCrud as any,
+      credentialsCrud as any,
+      userMethodsCrud as any,
+      userMethodTypesCrud as any,
+      methodsCrud as any,
+      methodTypesCrud as any,
+      methodTagsCrud as any,
+      fakeDictionaryCache(typesCrud, tagsCrud),
+      fakeUserMethodPolicy(false),
+    );
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+  }
 
   function expectCode(promise: Promise<unknown>, code: string): Promise<void> {
     return promise.then(
@@ -159,10 +179,10 @@ describe('UserSettingsService.updateMyMethods', () => {
     ));
 
   it('метод без тега user (system) → METHOD_NOT_CONFIGURABLE-017', async () => {
-    const signup = methodsCrud.seed({ method: 'signup' } as Partial<Method>);
-    methodTagsCrud.seed({ methodId: signup.id, tagId: 'tag-system' });
+    const signUp = methodsCrud.seed({ method: 'signUp' } as Partial<Method>);
+    methodTagsCrud.seed({ methodId: signUp.id, tagId: 'tag-system' });
     await expectCode(
-      service.updateMyMethods(CORE_USER_ID, [{ id: signup.id, types: [] }]),
+      service.updateMyMethods(CORE_USER_ID, [{ id: signUp.id, types: [] }]),
       'METHOD_NOT_CONFIGURABLE-017',
     );
   });
@@ -296,8 +316,8 @@ describe('UserSettingsService.updateMyMethods', () => {
     });
 
     it('system не попадает; default попадает с managedBy: global', async () => {
-      const signup = methodsCrud.seed({ method: 'signup' } as Partial<Method>);
-      methodTagsCrud.seed({ methodId: signup.id, tagId: 'tag-system' });
+      const signUp = methodsCrud.seed({ method: 'signUp' } as Partial<Method>);
+      methodTagsCrud.seed({ methodId: signUp.id, tagId: 'tag-system' });
       const plain = methodsCrud.seed({ method: 'plain' } as Partial<Method>);
       methodTagsCrud.seed({ methodId: plain.id, tagId: 'tag-default' });
       methodTypesCrud.seed({ methodId: plain.id, typeId: 'type-sms' });
@@ -369,17 +389,57 @@ describe('UserSettingsService.updateMyMethods', () => {
     it('несинхронизированный юзер → UNKNOWN_IDENTITY-015', () =>
       expectCode(service.listMyMethods('ghost'), 'UNKNOWN_IDENTITY-015'));
 
+    describe('opt-in (USER_METHODS_ACTIVE=false)', () => {
+      it('без переопределения: метод выключен, enabledTypes пуст', async () => {
+        const [view] = await buildOptInService().listMyMethods(CORE_USER_ID);
+
+        expect(view).toEqual({
+          id: transfer.id,
+          method: 'transfer',
+          isEnabled: false,
+          allowedTypes: ['email', 'sms'],
+          enabledTypes: [],
+          tags: ['user'],
+          managedBy: 'method',
+        });
+      });
+
+      it('после updateMyTwoFaMethod (opt-in) метод включается как обычно', async () => {
+        await service.updateMyMethods(CORE_USER_ID, [
+          { id: transfer.id, types: ['email'] },
+        ]);
+
+        const [view] = await buildOptInService().listMyMethods(CORE_USER_ID);
+
+        expect(view.isEnabled).toBe(true);
+        expect(view.enabledTypes).toEqual(['email']);
+      });
+
+      it('default-методы (managedBy: global) политикой не затрагиваются', async () => {
+        const plain = methodsCrud.seed({ method: 'plain' } as Partial<Method>);
+        methodTagsCrud.seed({ methodId: plain.id, tagId: 'tag-default' });
+        methodTypesCrud.seed({ methodId: plain.id, typeId: 'type-sms' });
+
+        const views = await buildOptInService().listMyMethods(CORE_USER_ID);
+
+        expect(views.find((view) => view.method === 'plain')).toMatchObject({
+          isEnabled: true,
+          managedBy: 'global',
+        });
+      });
+    });
+
     describe('фильтры', () => {
       beforeEach(async () => {
-        // signin (user, email) выключен юзером; plain (default, sms) включён
-        const signin = methodsCrud.seed({
-          method: 'signin',
+        // signIn (user, email) выключен юзером; plain (default, sms) включён
+        const signIn = methodsCrud.seed({
+          method: 'signIn',
         } as Partial<Method>);
-        methodTypesCrud.seed({ methodId: signin.id, typeId: 'type-email' });
-        methodTagsCrud.seed({ methodId: signin.id, tagId: 'tag-user' });
-        methodTagsCrud.seed({ methodId: signin.id, tagId: 'tag-unauthed' });
+        methodTypesCrud.seed({ methodId: signIn.id, typeId: 'type-email' });
+        methodTagsCrud.seed({ methodId: signIn.id, tagId: 'tag-user' });
+        methodTagsCrud.seed({ methodId: signIn.id, tagId: 'tag-unauthed' });
         await service.updateMyMethods(CORE_USER_ID, [
-          { id: signin.id, isActive: false, types: [] },
+          { id: signIn.id, isActive: false, types: [] },
         ]);
         const plain = methodsCrud.seed({ method: 'plain' } as Partial<Method>);
         methodTagsCrud.seed({ methodId: plain.id, tagId: 'tag-default' });
@@ -397,14 +457,14 @@ describe('UserSettingsService.updateMyMethods', () => {
         const views = await service.listMyMethods(CORE_USER_ID, {
           isEnabled: false,
         });
-        expect(views.map((view) => view.method)).toEqual(['signin']);
+        expect(views.map((view) => view.method)).toEqual(['signIn']);
       });
 
       it('tags: метод должен содержать все запрошенные', async () => {
         const views = await service.listMyMethods(CORE_USER_ID, {
           tags: ['user', 'unauthed'],
         });
-        expect(views.map((view) => view.method)).toEqual(['signin']);
+        expect(views.map((view) => view.method)).toEqual(['signIn']);
       });
 
       it('allowedTypes / enabledTypes: подмножество набора', async () => {
@@ -413,7 +473,7 @@ describe('UserSettingsService.updateMyMethods', () => {
         });
         expect(byAllowed.map((view) => view.method)).toEqual(['transfer']);
 
-        // у signin email разрешён, но выключен — enabledTypes его не содержит
+        // у signIn email разрешён, но выключен — enabledTypes его не содержит
         const byEnabled = await service.listMyMethods(CORE_USER_ID, {
           enabledTypes: ['email'],
         });
@@ -432,7 +492,7 @@ describe('UserSettingsService.updateMyMethods', () => {
         const views = await service.listMyMethods(CORE_USER_ID, {});
         expect(views.map((view) => view.method).sort()).toEqual([
           'plain',
-          'signin',
+          'signIn',
           'transfer',
         ]);
       });

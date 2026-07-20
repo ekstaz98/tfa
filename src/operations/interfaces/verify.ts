@@ -8,7 +8,7 @@ export interface VerifyParams {
 
 export interface VerifyResult {
   verified: boolean;
-  /** Гейтвею для signin нужно знать, кто прошёл проверку. */
+  /** Гейтвею для signIn нужно знать, кто прошёл проверку. */
   userId: string | null;
   identity: string | null;
 }

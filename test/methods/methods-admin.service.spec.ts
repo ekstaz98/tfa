@@ -107,7 +107,7 @@ describe('MethodsAdminService', () => {
 
     it('режимный тег + unauthed — допустимо (unauthed ортогонален)', async () => {
       const views = await service.createMethods([
-        { method: 'signup', types: ['sms'], tags: ['system', 'unauthed'] },
+        { method: 'signUp', types: ['sms'], tags: ['system', 'unauthed'] },
       ]);
       expect(views[0].tags).toEqual(['system', 'unauthed']);
     });
@@ -191,7 +191,7 @@ describe('MethodsAdminService', () => {
 
       beforeEach(async () => {
         const [created] = await service.createMethods([
-          { method: 'signup', types: ['sms'], tags: ['system', 'unauthed'] },
+          { method: 'signUp', types: ['sms'], tags: ['system', 'unauthed'] },
         ]);
         systemMethodId = created.id;
       });

@@ -1,6 +1,8 @@
 /* eslint-disable */
 /**
- * Демо-компаньон 2ФА-сервиса. Играет три роли из архитектуры:
+ * Демо-компаньон 2ФА-сервиса. Играет роли из архитектуры:
+ *  - админ: на старте идемпотентно заводит методы 2ФА (createTwoFaMethod) —
+ *    фронт этим не занимается;
  *  - гейтвей: проксирует GraphQL, проставляя заголовки (x-user-id, x-roles,
  *    x-client-ip, x-2fa-operationid) — фронт заголовков не знает;
  *  - core-система: после регистрации публикует user.sync в RMQ;
@@ -54,6 +56,67 @@ function normalizeIdentity(identity) {
 }
 
 let usersChannel = null;
+
+/**
+ * Конфигурация методов 2ФА — источник правды демо (роль админа). Заводится
+ * идемпотентно на старте, так что фронту admin-кнопка не нужна.
+ *  - signUp: system + unauthed — обязательная 2ФА при регистрации; тип (email
+ *    или sms) определяет канал подтверждения, фронт под него подстраивается;
+ *  - signIn: unauthed + user — юзер может отключить;
+ *  - transfer: user — индивидуальная настройка каналов;
+ *  - confirmChangePassword: system — обязательная 2ФА на смену пароля в ЛК.
+ */
+const METHODS = [
+  { method: 'signUp', types: ['EMAIL'], tags: ['SYSTEM', 'UNAUTHED'] },
+  { method: 'signIn', types: ['EMAIL'], tags: ['UNAUTHED', 'USER'] },
+  { method: 'transfer', types: ['SMS', 'EMAIL'], tags: ['USER'] },
+  { method: 'confirmChangePassword', types: ['EMAIL'], tags: ['SYSTEM'] },
+];
+
+async function gqlAdmin(query, variables) {
+  const response = await fetch(GQL_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-roles': 'admin' },
+    body: JSON.stringify({ query, variables }),
+  });
+  return response.json();
+}
+
+/** Сид методов по одному: уже существующий (WRONG_METHOD-005) — не ошибка. */
+async function seedMethods() {
+  const mutation = `mutation($input: CreateMethodsInput!) {
+      createTwoFaMethod(input: $input) { id method } }`;
+  for (const method of METHODS) {
+    const body = await gqlAdmin(mutation, { input: { methods: [method] } });
+    const exists = body.errors?.some((error) =>
+      String(error.code ?? '').startsWith('WRONG_METHOD-005'),
+    );
+    if (body.errors && !exists) {
+      console.error(
+        `seed ${method.method} failed:`,
+        body.errors.map((error) => error.message).join('; '),
+      );
+    } else {
+      console.log(`seed ${method.method}: ${exists ? 'exists' : 'created'}`);
+    }
+  }
+}
+
+/** Сервис поднимается не мгновенно — ретраим сид, пока GraphQL недоступен. */
+async function seedMethodsWithRetry(attempts = 15) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await seedMethods();
+      return;
+    } catch (error) {
+      console.log(
+        `2FA service not ready for seeding (${attempt}/${attempts}): ${error.message}`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+  console.error('method seeding gave up — 2FA service unreachable');
+}
 
 async function connectRmq() {
   const connection = await amqplib.connect(RMQ_URL);
@@ -154,6 +217,7 @@ app.post('/api/login', (req, res) => {
 
 connectRmq()
   .then(() => app.listen(PORT, () => console.log(`demo: http://localhost:${PORT}`)))
+  .then(() => seedMethodsWithRetry())
   .catch((error) => {
     console.error('RMQ connect failed:', error.message);
     process.exit(1);

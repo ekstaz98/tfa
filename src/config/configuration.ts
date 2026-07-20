@@ -52,6 +52,26 @@ export interface AppConfig {
     /** GraphQL-эндпоинт гейтвея для интроспекции в updateListMethods; без него автосинк недоступен. */
     graphqlUrl: string | null;
   };
+  methods: {
+    /**
+     * Состояние метода с тегом user, пока юзер не создал переопределение
+     * (user_methods): true (по умолчанию) — opt-out, метод включён
+     * конфигурацией админа, юзер отключает сам; false — opt-in, метод
+     * выключен, пока юзер явно не включит его (updateMyTwoFaMethod). Один
+     * флаг на все user-методы — см. UserMethodPolicyService.
+     */
+    userDefaultActive: boolean;
+    /**
+     * Начальное значение users.default_methods_enabled (общий переключатель
+     * default-методов) для юзера, которого только что создал user.sync
+     * (UsersSyncService._upsertUser). true (по умолчанию) — переключатель
+     * включён, юзер может выключить сам (updateMyTwoFaDefaults); false —
+     * юзер стартует с выключенными default-методами и должен включить их
+     * сам. На уже существующих юзеров не влияет — только на момент create.
+     * См. UserMethodPolicyService.defaultMethodsActive.
+     */
+    defaultMethodsActive: boolean;
+  };
   sendEvent: {
     /** Имя события отправки кода в events-сервисе интегрирующей системы. */
     name: string;
@@ -102,6 +122,12 @@ export default (): AppConfig => ({
   },
   gateway: {
     graphqlUrl: process.env.GATEWAY_GRAPHQL_URL ?? null,
+  },
+  methods: {
+    userDefaultActive:
+      (process.env.USER_METHODS_ACTIVE ?? 'true') === 'true',
+    defaultMethodsActive:
+      (process.env.DEFAULT_METHODS_ACTIVE ?? 'true') === 'true',
   },
   sendEvent: {
     name: process.env.SEND_EVENT_NAME ?? 'TFA_OTP',

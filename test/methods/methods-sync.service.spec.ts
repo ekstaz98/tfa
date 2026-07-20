@@ -48,7 +48,7 @@ describe('MethodsSyncService.updateListMethods', () => {
   });
 
   it('повторный синк идемпотентен', async () => {
-    gatewayNames = ['transfer', 'signin'];
+    gatewayNames = ['transfer', 'signIn'];
     await service.updateListMethods();
 
     const second = await service.updateListMethods();

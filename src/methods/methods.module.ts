@@ -7,6 +7,7 @@ import {
   MethodsAdminService,
   MethodsSyncService,
   SettingsHashService,
+  UserMethodPolicyService,
   UserSettingsService,
 } from './services';
 import { GATEWAY_METHODS_PORT } from './interfaces';
@@ -21,6 +22,7 @@ import { GATEWAY_METHODS_PORT } from './interfaces';
     UserSettingsService,
     EffectiveMethodsResolverService,
     SettingsHashService,
+    UserMethodPolicyService,
   ],
   exports: [
     MethodsAdminService,
@@ -28,6 +30,7 @@ import { GATEWAY_METHODS_PORT } from './interfaces';
     UserSettingsService,
     EffectiveMethodsResolverService,
     SettingsHashService,
+    UserMethodPolicyService,
   ],
 })
 export class MethodsModule {}

@@ -6,7 +6,7 @@ export class SendTwoFaInput {
   @Field()
   method: string;
 
-  /** Обязателен без авторизации (signin, регистрация), запрещён при ней. */
+  /** Обязателен без авторизации (signIn, регистрация), запрещён при ней. */
   @Field({ nullable: true })
   identity?: string;
 

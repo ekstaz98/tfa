@@ -48,7 +48,7 @@ type MyTwoFaMethod {
   """
   managedBy: TwoFaManagedBy!
 
-  """Имя метода (transfer, signin, ...)"""
+  """Имя метода (transfer, signIn, ...)"""
   method: String!
 
   """Теги метода"""

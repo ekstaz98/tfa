@@ -99,7 +99,7 @@ describe('CrudService (на примере MethodsCrudService / TagsCrudService)
     });
 
     it('с manager все вызовы идут через его репозиторий', async () => {
-      await service.create({ method: 'signin' }, manager);
+      await service.create({ method: 'signIn' }, manager);
       await service.findById('id-1', manager);
       await service.findBy({ isDeleted: false }, manager);
       await service.update('id-1', { isActive: false }, manager);

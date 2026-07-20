@@ -21,6 +21,7 @@ import {
   TwoFaManagedBy,
   UpdateMyMethodInput,
 } from '../interfaces';
+import { UserMethodPolicyService } from './user-method-policy.service';
 
 /**
  * updateMyTwoFaMethod: переопределение методов юзером. Разрешено только
@@ -42,6 +43,7 @@ export class UserSettingsService {
     private readonly _methodTypesCrud: MethodTypesCrudService,
     private readonly _methodTagsCrud: MethodTagsCrudService,
     private readonly _dictionaryCache: DictionaryCacheService,
+    private readonly _userMethodPolicy: UserMethodPolicyService,
   ) {}
 
   async updateMyMethods(
@@ -77,8 +79,9 @@ export class UserSettingsService {
    * не показывает, а экрану настроек нужны и id для повторного включения,
    * и allowedTypes для выбора. Методы без единого настроенного админом
    * типа (allowedTypes пуст, свежий автосинк) исключаются — управлять
-   * в них нечем. isEnabled = метод реально требует 2ФА. filter —
-   * опциональное сужение выдачи (см. MyMethodsFilter).
+   * в них нечем. isEnabled = метод реально требует 2ФА. user-метод без
+   * переопределения — по UserMethodPolicyService.userMethodsActive (opt-out/opt-in).
+   * filter — опциональное сужение выдачи (см. MyMethodsFilter).
    */
   async listMyMethods(
     coreUserId: string,
@@ -150,6 +153,10 @@ export class UserSettingsService {
                 .filter((name): name is string => name !== undefined)
                 .sort()
             : [];
+        } else if (!this._userMethodPolicy.userMethodsActive) {
+          // нет переопределения: opt-in-режим показывает метод выключенным
+          // (allowedTypes остаётся набором для включения на экране настроек)
+          enabledTypes = [];
         }
       } else if (managedBy === 'global' && !user.defaultMethodsEnabled) {
         enabledTypes = [];

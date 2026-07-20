@@ -4,7 +4,11 @@ import {
   InvalidUserSyncEventError,
   UsersSyncService,
 } from '../../src/users-sync/services';
-import { FakeCrud, fakeDataSource } from '../testing/fakes';
+import {
+  FakeCrud,
+  fakeDataSource,
+  fakeUserMethodPolicy,
+} from '../testing/fakes';
 
 const CORE_USER = 'core-user-1';
 
@@ -35,6 +39,7 @@ describe('UsersSyncService', () => {
       typesCrud as any,
       credentialsCrud as any,
       new IdentityNormalizerService(),
+      fakeUserMethodPolicy(), // defaultMethodsActive: true — прод-дефолт
     );
     /* eslint-enable @typescript-eslint/no-explicit-any */
   });
@@ -164,6 +169,63 @@ describe('UsersSyncService', () => {
       const alive = credentialsCrud.rows.filter((row) => !row.isDeleted);
       expect(alive).toHaveLength(1);
       expect(alive[0].identity).toBe('last@b.com');
+    });
+
+    describe('defaultMethodsEnabled нового юзера (DEFAULT_METHODS_ACTIVE)', () => {
+      it('политика true (по умолчанию): новый юзер создаётся включённым', async () => {
+        await service.syncUser({
+          userId: CORE_USER,
+          credentials: [{ type: 'email', identity: 'a@b.com' }],
+        });
+
+        expect(usersCrud.rows[0].defaultMethodsEnabled).toBe(true);
+      });
+
+      it('политика false: новый юзер создаётся выключенным', async () => {
+        /* eslint-disable @typescript-eslint/no-explicit-any */
+        const optedOutService = new UsersSyncService(
+          fakeDataSource(),
+          usersCrud as any,
+          typesCrud as any,
+          credentialsCrud as any,
+          new IdentityNormalizerService(),
+          fakeUserMethodPolicy(true, false),
+        );
+        /* eslint-enable @typescript-eslint/no-explicit-any */
+
+        await optedOutService.syncUser({
+          userId: CORE_USER,
+          credentials: [{ type: 'email', identity: 'a@b.com' }],
+        });
+
+        expect(usersCrud.rows[0].defaultMethodsEnabled).toBe(false);
+      });
+
+      it('уже существующего юзера повторная доставка не трогает (идемпотентность)', async () => {
+        await service.syncUser({
+          userId: CORE_USER,
+          credentials: [{ type: 'email', identity: 'a@b.com' }],
+        });
+        expect(usersCrud.rows[0].defaultMethodsEnabled).toBe(true);
+
+        /* eslint-disable @typescript-eslint/no-explicit-any */
+        const optedOutService = new UsersSyncService(
+          fakeDataSource(),
+          usersCrud as any,
+          typesCrud as any,
+          credentialsCrud as any,
+          new IdentityNormalizerService(),
+          fakeUserMethodPolicy(true, false),
+        );
+        /* eslint-enable @typescript-eslint/no-explicit-any */
+        await optedOutService.syncUser({
+          userId: CORE_USER,
+          credentials: [{ type: 'email', identity: 'new@b.com' }],
+        });
+
+        expect(usersCrud.rows).toHaveLength(1);
+        expect(usersCrud.rows[0].defaultMethodsEnabled).toBe(true);
+      });
     });
   });
 });

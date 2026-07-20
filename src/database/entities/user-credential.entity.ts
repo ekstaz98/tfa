@@ -13,7 +13,7 @@ import { User } from './user.entity';
 
 /**
  * Канал юзера (телефон/email) или TOTP-секрет.
- * identity глобально уникален среди неудалённых — точка входа unauthed signin.
+ * identity глобально уникален среди неудалённых — точка входа unauthed signIn.
  */
 @Entity('user_credentials')
 @Index('uq_user_credentials_type_identity', ['typeId', 'identity'], {

@@ -14,7 +14,10 @@ import {
   UserMethodType,
 } from '../../src/database/entities';
 import { CredentialCipherService } from '../../src/crypto/credential-cipher.service';
-import { EffectiveMethodsResolverService } from '../../src/methods/services';
+import {
+  EffectiveMethodsResolverService,
+  UserMethodPolicyService,
+} from '../../src/methods/services';
 import {
   FakeCodesCrud,
   FakeCrud,
@@ -65,6 +68,7 @@ export interface OperationsTestBed {
   codeGenerator: CodeGeneratorService;
   verifierRegistry: VerifierRegistry;
   effectiveMethods: EffectiveMethodsResolverService;
+  userMethodPolicy: UserMethodPolicyService;
   dictionaryCache: DictionaryCacheService;
   masker: IdentityMaskerService;
   normalizer: IdentityNormalizerService;
@@ -105,10 +109,21 @@ export const TEST_CONFIG_VALUES: Record<string, unknown> = {
   'sendEvent.providerByType': { email: 'smtp', sms: 'sms' },
   'totpCipher.currentVersion': '1',
   'totpCipher.keys': { '1': randomBytes(32).toString('hex') },
+  // opt-out (тот же дефолт, что и в проде без USER_METHODS_ACTIVE);
+  // тесты opt-in передают override в buildTestBed
+  'methods.userDefaultActive': true,
+  // тот же дефолт, что и в проде без DEFAULT_METHODS_ACTIVE
+  'methods.defaultMethodsActive': true,
 };
 
-export function buildTestBed(): OperationsTestBed {
-  const config = fakeConfig(TEST_CONFIG_VALUES);
+/**
+ * configOverrides — точечная подмена значений TEST_CONFIG_VALUES, например
+ * buildTestBed({ 'methods.userDefaultActive': false }) для opt-in-сценариев.
+ */
+export function buildTestBed(
+  configOverrides: Record<string, unknown> = {},
+): OperationsTestBed {
+  const config = fakeConfig({ ...TEST_CONFIG_VALUES, ...configOverrides });
   const ds = fakeDataSource();
   const publisher = new CapturingPublisher(ds);
 
@@ -144,6 +159,7 @@ export function buildTestBed(): OperationsTestBed {
     new HashCodeVerifier(codeGenerator),
     new TotpVerifier(crud.credentials as any, cipher),
   );
+  const userMethodPolicy = new UserMethodPolicyService(config);
   const effectiveMethods = new EffectiveMethodsResolverService(
     crud.users as any,
     crud.methods as any,
@@ -152,6 +168,7 @@ export function buildTestBed(): OperationsTestBed {
     crud.userMethods as any,
     crud.userMethodTypes as any,
     dictionaryCache,
+    userMethodPolicy,
   );
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -163,6 +180,7 @@ export function buildTestBed(): OperationsTestBed {
     codeGenerator,
     verifierRegistry,
     effectiveMethods,
+    userMethodPolicy,
     dictionaryCache,
     masker: new IdentityMaskerService(),
     normalizer: new IdentityNormalizerService(),

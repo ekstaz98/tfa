@@ -27,7 +27,7 @@ export class Operation {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  /** NULL для unauthed-флоу: signin до токена и регистрация (юзера ещё нет). */
+  /** NULL для unauthed-флоу: signIn до токена и регистрация (юзера ещё нет). */
   @Column({ type: 'uuid', nullable: true })
   userId: string | null;
 

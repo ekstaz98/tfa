@@ -13,6 +13,7 @@ import { EffectiveMethodsResolverService } from '../../src/methods/services';
 import {
   FakeCrud,
   fakeDictionaryCache,
+  fakeUserMethodPolicy,
   seedDictionaries,
 } from '../testing/fakes';
 
@@ -59,9 +60,26 @@ describe('EffectiveMethodsResolverService.resolve', () => {
       userMethodsCrud as any,
       userMethodTypesCrud as any,
       fakeDictionaryCache(typesCrud, tagsCrud),
+      fakeUserMethodPolicy(), // userMethodsActive: true — тот же opt-out, что и до флага
     );
     /* eslint-enable @typescript-eslint/no-explicit-any */
   });
+
+  /** Тот же сетап, но с opt-in-политикой (USER_METHODS_ACTIVE=false). */
+  function buildOptInService(): EffectiveMethodsResolverService {
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    return new EffectiveMethodsResolverService(
+      usersCrud as any,
+      methodsCrud as any,
+      methodTypesCrud as any,
+      methodTagsCrud as any,
+      userMethodsCrud as any,
+      userMethodTypesCrud as any,
+      fakeDictionaryCache(typesCrud, tagsCrud),
+      fakeUserMethodPolicy(false),
+    );
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+  }
 
   function addMethod(
     name: string,
@@ -101,8 +119,8 @@ describe('EffectiveMethodsResolverService.resolve', () => {
   }
 
   it('system: переопределение юзера игнорируется', async () => {
-    const signup = addMethod('signup', ['sms'], ['system', 'unauthed']);
-    addOverride(signup, [], false);
+    const signUp = addMethod('signUp', ['sms'], ['system', 'unauthed']);
+    addOverride(signUp, [], false);
 
     const views = await service.resolve(CORE_USER_ID);
 
@@ -163,22 +181,103 @@ describe('EffectiveMethodsResolverService.resolve', () => {
     });
   });
 
+  describe('user-методы: opt-in (USER_METHODS_ACTIVE=false)', () => {
+    it('resolve: без переопределения метод не попадает в требования', async () => {
+      addMethod('transfer', ['sms', 'email'], ['user']);
+
+      const views = await buildOptInService().resolve(CORE_USER_ID);
+
+      expect(views).toEqual([]);
+    });
+
+    it('resolve: явное включение (override active) действует как обычно', async () => {
+      const transfer = addMethod('transfer', ['sms', 'email'], ['user']);
+      addOverride(transfer, ['email']);
+
+      const views = await buildOptInService().resolve(CORE_USER_ID);
+
+      expect(views[0].types).toEqual(['email']);
+    });
+
+    it('resolve: явное выключение (override active=false) остаётся выключенным', async () => {
+      const transfer = addMethod('transfer', ['sms'], ['user']);
+      addOverride(transfer, ['sms'], false);
+
+      expect(await buildOptInService().resolve(CORE_USER_ID)).toEqual([]);
+    });
+
+    it('resolve: coreUserId = null (анонимная выдача) тоже гасится', async () => {
+      addMethod('signIn', ['sms'], ['unauthed', 'user']);
+
+      expect(await buildOptInService().resolve(null)).toEqual([]);
+    });
+
+    it('resolve: system и default политикой не затрагиваются', async () => {
+      addMethod('signUp', ['sms'], ['system', 'unauthed']);
+      addMethod('plain', ['sms'], ['default']);
+
+      const views = await buildOptInService().resolve(CORE_USER_ID);
+
+      expect(views.map((view) => view.method).sort()).toEqual([
+        'plain',
+        'signUp',
+      ]);
+    });
+
+    it('resolveMethodTypes: без переопределения метод не покрыт', async () => {
+      const transfer = addMethod('transfer', ['sms', 'email'], ['user']);
+
+      expect(
+        await buildOptInService().resolveMethodTypes(
+          transfer,
+          ['user'],
+          CORE_USER_ID,
+        ),
+      ).toEqual([]);
+    });
+
+    it('resolveMethodTypes: несинхронизированный юзер тоже не покрыт', async () => {
+      const transfer = addMethod('transfer', ['sms'], ['user']);
+
+      expect(
+        await buildOptInService().resolveMethodTypes(
+          transfer,
+          ['user'],
+          'ghost-user',
+        ),
+      ).toEqual([]);
+    });
+
+    it('resolveMethodTypes: явное включение действует как обычно', async () => {
+      const transfer = addMethod('transfer', ['sms', 'email'], ['user']);
+      addOverride(transfer, ['sms']);
+
+      expect(
+        await buildOptInService().resolveMethodTypes(
+          transfer,
+          ['user'],
+          CORE_USER_ID,
+        ),
+      ).toEqual(['sms']);
+    });
+  });
+
   it('userId = null → только методы с тегом unauthed', async () => {
-    addMethod('signin', ['sms'], ['unauthed', 'user']);
+    addMethod('signIn', ['sms'], ['unauthed', 'user']);
     addMethod('transfer', ['sms'], ['user']);
 
     const views = await service.resolve(null);
 
-    expect(views.map((view) => view.method)).toEqual(['signin']);
+    expect(views.map((view) => view.method)).toEqual(['signIn']);
   });
 
   it('фильтр по тегам: метод должен содержать все запрошенные', async () => {
-    addMethod('signup', ['sms'], ['system', 'unauthed']);
-    addMethod('signin', ['sms'], ['unauthed', 'user']);
+    addMethod('signUp', ['sms'], ['system', 'unauthed']);
+    addMethod('signIn', ['sms'], ['unauthed', 'user']);
 
     const views = await service.resolve(null, ['unauthed', 'system']);
 
-    expect(views.map((view) => view.method)).toEqual(['signup']);
+    expect(views.map((view) => view.method)).toEqual(['signUp']);
   });
 
   it('неизвестный тег в фильтре → UNKNOWN_TAG-001', async () => {
@@ -202,13 +301,13 @@ describe('EffectiveMethodsResolverService.resolve', () => {
       addMethod('transfer', ['sms'], ['default']);
       addMethod('plain', ['sms'], []);
       addMethod('secure', ['sms'], ['user']);
-      addMethod('signup', ['sms'], ['system', 'unauthed']);
+      addMethod('signUp', ['sms'], ['system', 'unauthed']);
 
       const views = await service.resolve(CORE_USER_ID);
 
       expect(views.map((view) => view.method).sort()).toEqual([
         'secure',
-        'signup',
+        'signUp',
       ]);
     });
 
@@ -226,11 +325,11 @@ describe('EffectiveMethodsResolverService.resolve', () => {
 
     it('resolveMethodTypes: system не гасится флагом', async () => {
       user.defaultMethodsEnabled = false;
-      const signup = addMethod('signup', ['sms'], ['system', 'unauthed']);
+      const signUp = addMethod('signUp', ['sms'], ['system', 'unauthed']);
 
       expect(
         await service.resolveMethodTypes(
-          signup,
+          signUp,
           ['system', 'unauthed'],
           CORE_USER_ID,
         ),
@@ -264,12 +363,12 @@ describe('EffectiveMethodsResolverService.resolve', () => {
     });
 
     it('system: переопределение игнорируется', async () => {
-      const signup = addMethod('signup', ['sms'], ['system', 'unauthed']);
-      addOverride(signup, [], false);
+      const signUp = addMethod('signUp', ['sms'], ['system', 'unauthed']);
+      addOverride(signUp, [], false);
 
       expect(
         await service.resolveMethodTypes(
-          signup,
+          signUp,
           ['system', 'unauthed'],
           CORE_USER_ID,
         ),

@@ -7,6 +7,7 @@ import {
 } from '../../database/crud';
 import { User } from '../../database/entities';
 import { IdentityNormalizerService } from '../../operations/services';
+import { UserMethodPolicyService } from '../../methods/services';
 import { UserSyncEvent } from '../interfaces';
 
 /** Битый payload: не реквьюится (вечный цикл), сообщение подтверждается и логируется. */
@@ -18,6 +19,9 @@ export class InvalidUserSyncEventError extends Error {}
  * доставка (at-least-once) не создаёт дублей и молча не выключает каналы
  * (анти-урок старого сервиса). Identity нормализуется; креды из событий —
  * is_confirmed = true (канал верифицирован на стороне интегрирующей системы).
+ * Новый юзер стартует с users.default_methods_enabled по
+ * UserMethodPolicyService.defaultMethodsActive — уже
+ * существующего юзера повторная доставка не трогает (идемпотентность).
  */
 @Injectable()
 export class UsersSyncService {
@@ -29,6 +33,7 @@ export class UsersSyncService {
     private readonly _typesCrud: TypesCrudService,
     private readonly _credentialsCrud: UserCredentialsCrudService,
     private readonly _normalizer: IdentityNormalizerService,
+    private readonly _userMethodPolicy: UserMethodPolicyService,
   ) {}
 
   parseEvent(payload: unknown): UserSyncEvent {
@@ -96,7 +101,14 @@ export class UsersSyncService {
     if (existing) {
       return existing;
     }
-    return this._usersCrud.create({ userId: coreUserId }, manager);
+    return this._usersCrud.create(
+      {
+        userId: coreUserId,
+        defaultMethodsEnabled:
+          this._userMethodPolicy.defaultMethodsActive,
+      },
+      manager,
+    );
   }
 
   private async _upsertCredential(

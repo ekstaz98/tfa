@@ -52,7 +52,7 @@ async function waitFor<T>(
 
 /**
  * Сквозной сценарий скелета (этап 8 плана): регистрация по незнакомому
- * identity → событие создания юзера из интегрирующей системы → signin по
+ * identity → событие создания юзера из интегрирующей системы → signIn по
  * identity с 2ФА → настройка юзера → transfer через verifyTwoFa.
  * Коды читаются из мок-реализации порта отправки — API чтения кодов нет.
  */
@@ -133,7 +133,7 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
     verifyTwoFa(input: $input) { verified required userId identity }
   }`;
 
-  it('0. админ настраивает методы: signup, signin, transfer', async () => {
+  it('0. админ настраивает методы: signUp, signIn, transfer', async () => {
     const body = await gql(
       `mutation($input: CreateMethodsInput!) {
         createTwoFaMethod(input: $input) { id method }
@@ -141,8 +141,8 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
       {
         input: {
           methods: [
-            { method: 'signup', types: ['SMS'], tags: ['SYSTEM', 'UNAUTHED'] },
-            { method: 'signin', types: ['EMAIL'], tags: ['UNAUTHED', 'USER'] },
+            { method: 'signUp', types: ['SMS'], tags: ['SYSTEM', 'UNAUTHED'] },
+            { method: 'signIn', types: ['EMAIL'], tags: ['UNAUTHED', 'USER'] },
             { method: 'transfer', types: ['SMS', 'EMAIL'], tags: ['USER'] },
           ],
         },
@@ -161,7 +161,7 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
   it('1. регистрация: код на незнакомый номер, verify подтверждает владение каналом', async () => {
     const sendBody = await gql(
       SEND_TWO_FA,
-      { input: { method: 'signup', identity: PHONE_RAW } },
+      { input: { method: 'signUp', identity: PHONE_RAW } },
       { 'x-client-ip': '10.1.1.1' },
     );
     expect(sendBody.errors).toBeUndefined();
@@ -173,7 +173,7 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
       {
         input: {
           operationId,
-          method: 'signup',
+          method: 'signUp',
           codes: [{ type: 'SMS', code: lastCodeFor(operationId) }],
         },
       },
@@ -211,16 +211,16 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
     });
   });
 
-  it('3. signin по identity: гейтвей узнаёт required и кто прошёл проверку', async () => {
+  it('3. signIn по identity: гейтвей узнаёт required и кто прошёл проверку', async () => {
     const required = await gql(
       VERIFY_TWO_FA,
-      { input: { method: 'signin', identity: EMAIL } },
+      { input: { method: 'signIn', identity: EMAIL } },
       SERVICE,
     );
     expect(required.data!.verifyTwoFa.required).toBe(true);
 
     const sendBody = await gql(SEND_TWO_FA, {
-      input: { method: 'signin', identity: ` ${EMAIL_RAW} ` },
+      input: { method: 'signIn', identity: ` ${EMAIL_RAW} ` },
     });
     expect(sendBody.errors).toBeUndefined();
     const operationId = sendBody.data!.sendTwoFa.operationId as string;
@@ -233,7 +233,7 @@ describe('Сквозной флоу 2ФА (e2e)', () => {
       {
         input: {
           operationId,
-          method: 'signin',
+          method: 'signIn',
           codes: [{ type: 'EMAIL', code: lastCodeFor(operationId) }],
         },
       },

@@ -1,7 +1,7 @@
 export interface SendActor {
   /** core userId авторизованного клиента (из заголовков гейтвея). */
   userId?: string | null;
-  /** identity неавторизованного клиента (signin, регистрация). */
+  /** identity неавторизованного клиента (signIn, регистрация). */
   identity?: string | null;
   /** client IP из заголовка гейтвея — опора часового IP-лимита. */
   clientIp?: string | null;

@@ -46,25 +46,24 @@
 <header>
   <h1>Демо 2ФА-сервиса</h1>
   <span id="who" class="badge">аноним</span>
-  <button id="seedBtn" title="createTwoFaMethod: signup/signin/transfer">Настроить методы (админ)</button>
   <button id="logoutBtn" class="hidden">Выйти</button>
 </header>
 <main>
 <div>
   <section class="card" id="registerCard">
-    <h2>Регистрация <span class="hint">(signup — system + unauthed, код на SMS)</span></h2>
-    <label>Телефон</label><input id="regPhone" value="+7 912 000-11-22">
+    <h2>Регистрация <span class="hint" id="regHint">(signUp — system + unauthed)</span></h2>
+    <label>Телефон</label><input id="regPhone" value="+79996666655">
     <label>Email</label><input id="regEmail" value="demo@example.com">
     <div class="row">
       <button class="primary" id="regSendBtn">Получить код</button>
-      <input id="regCode" placeholder="код из SMS" style="max-width:140px" class="hidden">
+      <input id="regCode" placeholder="код" style="max-width:140px" class="hidden">
       <button id="regVerifyBtn" class="hidden">Подтвердить</button>
     </div>
     <div class="msg" id="regMsg"></div>
   </section>
 
   <section class="card" id="loginCard">
-    <h2>Вход <span class="hint">(signin — unauthed + user, код на email)</span></h2>
+    <h2>Вход <span class="hint">(signIn — unauthed + user, код на email)</span></h2>
     <label>Email или телефон</label><input id="loginIdentity" value="demo@example.com">
     <div class="row">
       <button class="primary" id="loginSendBtn">Продолжить</button>
@@ -101,6 +100,17 @@
       <button id="txResendBtn">Переотправить коды</button>
     </div>
     <div class="msg" id="txMsg"></div>
+  </section>
+
+  <section class="card hidden" id="pwdCard">
+    <h2>Смена пароля <span class="hint">(confirmChangePassword — system, обязательная 2ФА)</span></h2>
+    <label>Новый пароль</label><input id="newPwd" type="password" value="newSecret123">
+    <div class="row">
+      <button class="primary" id="pwdSendBtn">Сменить пароль</button>
+      <input id="pwdCode" placeholder="код" style="max-width:140px" class="hidden">
+      <button id="pwdVerifyBtn" class="hidden">Подтвердить</button>
+    </div>
+    <div class="msg" id="pwdMsg"></div>
   </section>
 </div>
 
@@ -141,21 +151,25 @@ async function refreshSession() {
   show($('logoutBtn'), !!userId);
   show($('cabinetCard'), !!userId);
   show($('txCard'), !!userId);
+  show($('pwdCard'), !!userId);
   if (userId) await refreshCabinet();
 }
 $('logoutBtn').onclick = async () => { await fetch('/api/session', { method: 'DELETE' }); refreshSession(); };
 
-// ---------- сид методов ----------
-$('seedBtn').onclick = async () => {
-  const body = await gql(`mutation($input: CreateMethodsInput!) {
-      createTwoFaMethod(input: $input) { id method } }`,
-    { input: { methods: [
-      { method: 'signup', types: ['SMS'], tags: ['SYSTEM', 'UNAUTHED'] },
-      { method: 'signin', types: ['EMAIL'], tags: ['UNAUTHED', 'USER'] },
-      { method: 'transfer', types: ['SMS', 'EMAIL'], tags: ['USER'] },
-    ] } }, { role: 'admin' });
-  alert(body.errors ? `Методы уже настроены или ошибка: ${errText(body)}` : 'Методы созданы: signup, signin, transfer');
-};
+// ---------- канал регистрации ----------
+// signUp — unauthed-метод, поэтому его конфигурацию видно и анониму. Читаем
+// настроенный админом тип, чтобы слать код на нужный канал (email или SMS).
+let signUpType = 'email';
+async function loadSignUpType() {
+  const body = await gql(`query($input: TwoFaMethodsInput!) {
+      twoFaMethods(input: $input) { methods { method types } } }`,
+    { input: { tags: ['UNAUTHED'] } }, { anon: true });
+  const signUp = body.data?.twoFaMethods?.methods?.find((m) => m.method === 'signUp');
+  if (signUp?.types?.length) signUpType = signUp.types[0].toLowerCase();
+  const isEmail = signUpType === 'email';
+  $('regHint').textContent = `(signUp — system + unauthed, код на ${isEmail ? 'email' : 'SMS'})`;
+  $('regCode').placeholder = isEmail ? 'код из письма' : 'код из SMS';
+}
 
 // ---------- входящие ----------
 setInterval(async () => {
@@ -167,27 +181,31 @@ setInterval(async () => {
 
 // ---------- регистрация ----------
 let regOperationId = null;
+let regType = 'email'; // тип, которым реально ушёл код (из ответа sendTwoFa)
 $('regSendBtn').onclick = async () => {
+  // код на канал, под который настроен signUp: email → на email, sms → на телефон
+  const identity = signUpType === 'email' ? $('regEmail').value : $('regPhone').value;
   const body = await gql(`mutation($input: SendTwoFaInput!) {
       sendTwoFa(input: $input) { operationId types { type identity expire } } }`,
-    { input: { method: 'signup', identity: $('regPhone').value } }, { anon: true });
+    { input: { method: 'signUp', identity } }, { anon: true });
   if (body.errors) return msg($('regMsg'), errText(body), false);
   regOperationId = body.data.sendTwoFa.operationId;
+  regType = body.data.sendTwoFa.types[0].type;
   show($('regCode')); show($('regVerifyBtn'));
-  msg($('regMsg'), `SMS отправлена на ${body.data.sendTwoFa.types[0].identity} — код во «входящих» справа`, true);
+  msg($('regMsg'), `Код (${regType}) отправлен на ${body.data.sendTwoFa.types[0].identity} — во «входящих» справа`, true);
 };
 $('regVerifyBtn').onclick = async () => {
   const body = await gql(`mutation($input: VerifyTwoFaInput!) {
       verifyTwoFa(input: $input) { verified identity } }`,
-    { input: { operationId: regOperationId, method: 'signup',
-      codes: [{ type: 'SMS', code: $('regCode').value.trim() }] } },
+    { input: { operationId: regOperationId, method: 'signUp',
+      codes: [{ type: regType.toUpperCase(), code: $('regCode').value.trim() }] } },
     { role: 'service', anon: true });
   if (body.errors) return msg($('regMsg'), errText(body), false);
-  // канал подтверждён — «core» создаёт юзера и шлёт user.sync
+  // канал подтверждён — «core» создаёт юзера с обоими каналами и шлёт user.sync
   const created = await (await fetch('/api/core/users', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ credentials: [
-      { type: 'sms', identity: body.data.verifyTwoFa.identity },
+      { type: 'sms', identity: $('regPhone').value },
       { type: 'email', identity: $('regEmail').value },
     ] }),
   })).json();
@@ -201,7 +219,7 @@ $('loginSendBtn').onclick = async () => {
   // как гейтвей: сначала «нужна ли 2ФА для этого identity?»
   const required = await gql(`mutation($input: VerifyTwoFaInput!) {
       verifyTwoFa(input: $input) { required } }`,
-    { input: { method: 'signin', identity } }, { role: 'service', anon: true });
+    { input: { method: 'signIn', identity } }, { role: 'service', anon: true });
   if (required.errors) return msg($('loginMsg'), errText(required), false);
   if (!required.data.verifyTwoFa.required) {
     // 2ФА выключена юзером (или метод не покрыт) — core пускает без кода
@@ -211,12 +229,12 @@ $('loginSendBtn').onclick = async () => {
     });
     const result = await response.json();
     if (!response.ok) return msg($('loginMsg'), result.error, false);
-    msg($('loginMsg'), 'Вход выполнен БЕЗ 2ФА — метод signin у вас отключён', true);
+    msg($('loginMsg'), 'Вход выполнен БЕЗ 2ФА — метод signIn у вас отключён', true);
     return refreshSession();
   }
   const body = await gql(`mutation($input: SendTwoFaInput!) {
       sendTwoFa(input: $input) { operationId types { type identity } } }`,
-    { input: { method: 'signin', identity } }, { anon: true });
+    { input: { method: 'signIn', identity } }, { anon: true });
   if (body.errors) return msg($('loginMsg'), errText(body), false);
   loginOperationId = body.data.sendTwoFa.operationId;
   show($('loginCode')); show($('loginVerifyBtn'));
@@ -225,7 +243,7 @@ $('loginSendBtn').onclick = async () => {
 $('loginVerifyBtn').onclick = async () => {
   const body = await gql(`mutation($input: VerifyTwoFaInput!) {
       verifyTwoFa(input: $input) { verified userId } }`,
-    { input: { operationId: loginOperationId, method: 'signin', identity: $('loginIdentity').value,
+    { input: { operationId: loginOperationId, method: 'signIn', identity: $('loginIdentity').value,
       codes: [{ type: 'EMAIL', code: $('loginCode').value.trim() }] } },
     { role: 'service', anon: true });
   if (body.errors) return msg($('loginMsg'), errText(body), false);
@@ -374,7 +392,35 @@ $('txVerifyBtn').onclick = async () => {
   msg($('txMsg'), '✓ Перевод 100 ₽ выполнен — операция верифицирована', true);
 };
 
+// ---------- смена пароля ----------
+// confirmChangePassword — system-метод: 2ФА обязательна и юзером не отключается,
+// поэтому required-проверку пропускаем и сразу шлём код (на email по конфигу).
+let pwdOperationId = null;
+let pwdType = 'email';
+$('pwdSendBtn').onclick = async () => {
+  if (!$('newPwd').value.trim()) return msg($('pwdMsg'), 'Введите новый пароль', false);
+  const body = await gql(`mutation($input: SendTwoFaInput!) {
+      sendTwoFa(input: $input) { operationId types { type identity expire } } }`,
+    { input: { method: 'confirmChangePassword' } });
+  if (body.errors) return msg($('pwdMsg'), errText(body), false);
+  pwdOperationId = body.data.sendTwoFa.operationId;
+  pwdType = body.data.sendTwoFa.types[0].type;
+  show($('pwdCode')); show($('pwdVerifyBtn'));
+  msg($('pwdMsg'), `Код (${pwdType}) отправлен на ${body.data.sendTwoFa.types[0].identity} — подтвердите смену`, true);
+};
+$('pwdVerifyBtn').onclick = async () => {
+  const body = await gql(`mutation($input: VerifyTwoFaInput!) {
+      verifyTwoFa(input: $input) { verified } }`,
+    { input: { operationId: pwdOperationId, method: 'confirmChangePassword', userId,
+      codes: [{ type: pwdType.toUpperCase(), code: $('pwdCode').value.trim() }] } },
+    { role: 'service' });
+  if (body.errors) return msg($('pwdMsg'), errText(body), false);
+  show($('pwdCode'), false); show($('pwdVerifyBtn'), false);
+  msg($('pwdMsg'), '✓ Пароль изменён — операция подтверждена 2ФА', true);
+};
+
 refreshSession();
+loadSignUpType();
 </script>
 </body>
 </html>

@@ -13,6 +13,7 @@ import { Method, User } from '../../database/entities';
 import { TwoFaError, TwoFaErrorCode } from '../../errors';
 import { TAG_SYSTEM, TAG_UNAUTHED, TAG_USER } from './../constants';
 import { MethodView } from '../interfaces';
+import { UserMethodPolicyService } from './user-method-policy.service';
 
 /** Актор для резолва: загруженный юзер, core userId или null (аноним). */
 export type EffectiveActor = User | string | null;
@@ -23,7 +24,8 @@ export type EffectiveActor = User | string | null;
  * default (или метод без режимного тега) — конфигурация метода, но все
  * такие методы разом гасятся общим переключателем юзера
  * users.default_methods_enabled; user — запись в user_methods =
- * индивидуальное переопределение юзера.
+ * индивидуальное переопределение юзера, а без неё действует
+ * UserMethodPolicyService.userMethodsActive (opt-out/opt-in, см. её doc).
  * unauthed — ортогональный модификатор: userId = null видит только их.
  * Методы с 0 эффективных типов в требования не попадают.
  */
@@ -37,6 +39,7 @@ export class EffectiveMethodsResolverService {
     private readonly _userMethodsCrud: UserMethodsCrudService,
     private readonly _userMethodTypesCrud: UserMethodTypesCrudService,
     private readonly _dictionaryCache: DictionaryCacheService,
+    private readonly _userMethodPolicy: UserMethodPolicyService,
   ) {}
 
   async resolve(
@@ -100,6 +103,10 @@ export class EffectiveMethodsResolverService {
             overrides.typeIdsByUserMethodId.get(override.id) ?? [],
             typeNameById,
           );
+        } else if (!this._userMethodPolicy.userMethodsActive) {
+          // нет переопределения: opt-in-режим гасит метод, opt-out оставляет
+          // конфигурацию метода как есть (typeNames уже она)
+          typeNames = [];
         }
       } else if (
         !tagNames.includes(TAG_SYSTEM) &&
@@ -157,24 +164,30 @@ export class EffectiveMethodsResolverService {
 
     if (methodTagNames.includes(TAG_USER)) {
       const user = await this._resolveUser(actor);
-      if (user) {
-        const [override] = await this._userMethodsCrud.findBy({
-          userId: user.id,
-          methodId: method.id,
-          isDeleted: false,
-        });
-        if (override) {
-          const overrideTypeRows = override.isActive
-            ? await this._userMethodTypesCrud.findBy({
-                userMethodId: override.id,
-              })
-            : [];
-          typeNames = this._applyOverride(
-            override.isActive,
-            overrideTypeRows.map((row) => row.typeId),
-            activeTypeNameById,
-          );
-        }
+      const override = user
+        ? (
+            await this._userMethodsCrud.findBy({
+              userId: user.id,
+              methodId: method.id,
+              isDeleted: false,
+            })
+          )[0]
+        : undefined;
+      if (override) {
+        const overrideTypeRows = override.isActive
+          ? await this._userMethodTypesCrud.findBy({
+              userMethodId: override.id,
+            })
+          : [];
+        typeNames = this._applyOverride(
+          override.isActive,
+          overrideTypeRows.map((row) => row.typeId),
+          activeTypeNameById,
+        );
+      } else if (!this._userMethodPolicy.userMethodsActive) {
+        // нет переопределения (юзер не синхронизирован, или синхронизирован,
+        // но user_methods нет): opt-in-режим гасит метод
+        typeNames = [];
       }
     } else if (!methodTagNames.includes(TAG_SYSTEM)) {
       // default/без режимного тега: общий переключатель юзера

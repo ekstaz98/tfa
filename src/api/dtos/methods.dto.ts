@@ -93,7 +93,7 @@ export class MyTwoFaMethodDto {
   @Field(() => ID, { description: 'id метода (methods.id)' })
   id: string;
 
-  @Field({ description: 'Имя метода (transfer, signin, ...)' })
+  @Field({ description: 'Имя метода (transfer, signIn, ...)' })
   method: string;
 
   @Field({

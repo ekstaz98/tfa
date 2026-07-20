@@ -3,7 +3,7 @@
 Микросервис двухфакторной аутентификации: конфигурация методов админом
 (плюс автосинк из гейтвея), пользовательские настройки, генерация и отправка
 кодов (за портом), верификация по запросу гейтвея, поддержка авторизованных
-и неавторизованных клиентов (signin, регистрация).
+и неавторизованных клиентов (signIn, регистрация).
 
 План — `../2fa_service_plan.md`, схема БД — `../2fa_schema.dbml`,
 юз-кейсы — `../2fa_use_cases.md`.
@@ -108,7 +108,7 @@ verifyTwoFa(input: {
   operationId: ID       # опционально
   method: String!
   userId: String        # authed-запросы
-  identity: String      # unauthed-запросы (login из signin)
+  identity: String      # unauthed-запросы (login из signIn)
   codes: [{ type, code }]
 }) { verified required userId identity }
 ```
@@ -119,7 +119,7 @@ verifyTwoFa(input: {
 - **без `operationId`** — «покрыт ли метод»: `{ required: boolean }` для
   `(method, userId | identity)`; неизвестный/неактивный метод →
   `required: false`; ответ по identity учитывает настройки юзера — юзер
-  может полностью отключить 2ФА на signin.
+  может полностью отключить 2ФА на signIn.
 
 ### Требования к гейтвею
 
@@ -194,7 +194,7 @@ providerName события задаётся в `SEND_PROVIDER_MAP`. Типу с
 ## Демо-фронт
 
 `demo/` — одностраничный стенд, демонстрирующий полный цикл: регистрация
-(signup), вход по identity (signin), личный кабинет (myTwoFaMethods,
+(signUp), вход по identity (signIn), личный кабинет (myTwoFaMethods,
 общий переключатель, индивидуальные настройки) и моковая транзакция
 (transfer c кодами). Демо-сервер играет гейтвей (проставляет заголовки),
 core-систему (публикует `user.sync`) и каналы доставки (читает очередь
@@ -218,7 +218,7 @@ npm run test:e2e   # нужен docker compose (postgres + rabbitmq)
 ```
 
 e2e ходят в отдельные базы (`tfa_e2e*`, пересоздаются при прогоне), включая
-сквозной сценарий: регистрация → RMQ-событие юзера → signin по identity →
+сквозной сценарий: регистрация → RMQ-событие юзера → signIn по identity →
 updateMyTwoFaMethod → transfer через verifyTwoFa.
 
 ## Вне скоупа скелета

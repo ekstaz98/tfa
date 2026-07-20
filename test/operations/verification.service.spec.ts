@@ -210,9 +210,9 @@ describe('VerificationService.verify', () => {
     ));
 
   it('чужой method → UNKNOWN_OPERATION-008 (не палим существование)', async () => {
-    bed.addMethod('signin', ['sms'], ['unauthed', 'user']);
+    bed.addMethod('signIn', ['sms'], ['unauthed', 'user']);
     await expectCode(
-      verify(bothCodes(), { method: 'signin' }),
+      verify(bothCodes(), { method: 'signIn' }),
       'UNKNOWN_OPERATION-008',
     );
   });

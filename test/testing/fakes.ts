@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { DataSource, EntityManager, FindOperator } from 'typeorm';
 import { OperationStatus } from '../../src/database/entities';
 import { DictionaryCacheService } from '../../src/database/services';
+import { UserMethodPolicyService } from '../../src/methods/services';
 
 interface HasId {
   id: string;
@@ -188,6 +189,26 @@ export function fakeConfig(values: Record<string, unknown>): ConfigService {
       return values[path];
     },
   } as unknown as ConfigService;
+}
+
+/**
+ * UserMethodPolicyService поверх fakeConfig. Оба параметра по умолчанию true
+ * — тот же opt-out/включённый-по-умолчанию режим, что и в проде без
+ * USER_METHODS_ACTIVE / DEFAULT_METHODS_ACTIVE.
+ *   userMethodsActive — false для тестов «юзер сам включает user-метод» (opt-in).
+ *   defaultMethodsActive — false для тестов «новый юзер стартует
+ *   с выключенным общим переключателем default-методов».
+ */
+export function fakeUserMethodPolicy(
+  userMethodsActive = true,
+  defaultMethodsActive = true,
+): UserMethodPolicyService {
+  return new UserMethodPolicyService(
+    fakeConfig({
+      'methods.userDefaultActive': userMethodsActive,
+      'methods.defaultMethodsActive': defaultMethodsActive,
+    }),
+  );
 }
 
 /**

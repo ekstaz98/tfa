@@ -137,7 +137,7 @@ describe('2FA API (e2e)', () => {
       ]);
     });
 
-    it('админ создаёт transfer, signin, signup', async () => {
+    it('админ создаёт transfer, signIn, signUp', async () => {
       const body = await gql(
         CREATE_METHODS,
         {
@@ -145,12 +145,12 @@ describe('2FA API (e2e)', () => {
             methods: [
               { method: 'transfer', types: ['SMS', 'EMAIL'], tags: ['USER'] },
               {
-                method: 'signin',
+                method: 'signIn',
                 types: ['EMAIL'],
                 tags: ['UNAUTHED', 'USER'],
               },
               {
-                method: 'signup',
+                method: 'signUp',
                 types: ['SMS'],
                 tags: ['SYSTEM', 'UNAUTHED'],
               },
@@ -257,7 +257,7 @@ describe('2FA API (e2e)', () => {
         (methods as Array<{ method: string }>)
           .map((view) => view.method)
           .sort(),
-      ).toEqual(['signin', 'signup', 'transfer']);
+      ).toEqual(['signIn', 'signUp', 'transfer']);
 
       const second = await gql(query, { input: { hash } }, AUTHED);
       expect(second.data!.twoFaMethods).toEqual({
@@ -299,7 +299,7 @@ describe('2FA API (e2e)', () => {
         {
           input: {
             operationId,
-            method: 'signin',
+            method: 'signIn',
             userId: USER_ID,
             codes: [{ type: 'SMS', code: '000000' }],
           },
@@ -378,11 +378,11 @@ describe('2FA API (e2e)', () => {
   });
 
   describe('unauthed-флоу: регистрация', () => {
-    it('signup на незнакомый номер: код уходит, verify возвращает identity', async () => {
+    it('signUp на незнакомый номер: код уходит, verify возвращает identity', async () => {
       const identity = '+7 999 000-11-22';
       const sendBody = await gql(
         SEND_TWO_FA,
-        { input: { method: 'signup', identity } },
+        { input: { method: 'signUp', identity } },
         { 'x-client-ip': '10.0.0.1' },
       );
       expect(sendBody.errors).toBeUndefined();
@@ -393,7 +393,7 @@ describe('2FA API (e2e)', () => {
         {
           input: {
             operationId,
-            method: 'signup',
+            method: 'signUp',
             codes: [{ type: 'SMS', code: codeFor(operationId, 'sms') }],
           },
         },
@@ -430,19 +430,19 @@ describe('2FA API (e2e)', () => {
     it('required по identity учитывает настройки юзера', async () => {
       const before = await gql(
         VERIFY_TWO_FA,
-        { input: { method: 'signin', identity: EMAIL_IDENTITY } },
+        { input: { method: 'signIn', identity: EMAIL_IDENTITY } },
         SERVICE,
       );
       expect(before.data!.verifyTwoFa.required).toBe(true);
 
-      // юзер отключает 2ФА на signin
+      // юзер отключает 2ФА на signIn
       const updated = await gql(
         `mutation($input: UpdateMyMethodsInput!) {
           updateMyTwoFaMethod(input: $input) { id isActive types }
         }`,
         {
           input: {
-            methods: [{ id: methodIds.signin, isActive: false, types: [] }],
+            methods: [{ id: methodIds.signIn, isActive: false, types: [] }],
           },
         },
         AUTHED,
@@ -451,7 +451,7 @@ describe('2FA API (e2e)', () => {
 
       const after = await gql(
         VERIFY_TWO_FA,
-        { input: { method: 'signin', identity: EMAIL_IDENTITY } },
+        { input: { method: 'signIn', identity: EMAIL_IDENTITY } },
         SERVICE,
       );
       expect(after.data!.verifyTwoFa.required).toBe(false);
@@ -463,8 +463,8 @@ describe('2FA API (e2e)', () => {
       myTwoFaMethods { id method isEnabled allowedTypes enabledTypes tags }
     }`;
 
-    it('выключенный signin остаётся в списке, в twoFaMethods его нет', async () => {
-      // signin выключен юзером в предыдущем тесте
+    it('выключенный signIn остаётся в списке, в twoFaMethods его нет', async () => {
+      // signIn выключен юзером в предыдущем тесте
       const body = await gql(MY_METHODS, undefined, AUTHED);
       expect(body.errors).toBeUndefined();
       const byName = new Map(
@@ -474,9 +474,9 @@ describe('2FA API (e2e)', () => {
         ]),
       );
 
-      expect(byName.get('signin')).toEqual({
-        id: methodIds.signin,
-        method: 'signin',
+      expect(byName.get('signIn')).toEqual({
+        id: methodIds.signIn,
+        method: 'signIn',
         isEnabled: false,
         allowedTypes: ['email'],
         enabledTypes: [],
@@ -486,8 +486,8 @@ describe('2FA API (e2e)', () => {
         isEnabled: true,
         allowedTypes: ['email', 'sms'],
       });
-      // system-метод signup юзеру не настраивается — его в списке нет
-      expect(byName.has('signup')).toBe(false);
+      // system-метод signUp юзеру не настраивается — его в списке нет
+      expect(byName.has('signUp')).toBe(false);
 
       const effective = await gql(
         `{ twoFaMethods { methods { method } } }`,
@@ -498,7 +498,7 @@ describe('2FA API (e2e)', () => {
         (effective.data!.twoFaMethods.methods as Array<{ method: string }>)
           .map((view) => view.method)
           .sort(),
-      ).not.toContain('signin');
+      ).not.toContain('signIn');
     });
 
     it('после включения обратно isEnabled: true и метод снова в twoFaMethods', async () => {
@@ -509,7 +509,7 @@ describe('2FA API (e2e)', () => {
         {
           input: {
             methods: [
-              { id: methodIds.signin, isActive: true, types: ['EMAIL'] },
+              { id: methodIds.signIn, isActive: true, types: ['EMAIL'] },
             ],
           },
         },
@@ -518,14 +518,14 @@ describe('2FA API (e2e)', () => {
       expect(updated.errors).toBeUndefined();
 
       const body = await gql(MY_METHODS, undefined, AUTHED);
-      const signin = (
+      const signIn = (
         body.data!.myTwoFaMethods as Array<{
           method: string;
           isEnabled: boolean;
           enabledTypes: string[];
         }>
-      ).find((view) => view.method === 'signin');
-      expect(signin).toMatchObject({
+      ).find((view) => view.method === 'signIn');
+      expect(signIn).toMatchObject({
         isEnabled: true,
         enabledTypes: ['email'],
       });
@@ -539,7 +539,7 @@ describe('2FA API (e2e)', () => {
         (effective.data!.twoFaMethods.methods as Array<{ method: string }>).map(
           (view) => view.method,
         ),
-      ).toContain('signin');
+      ).toContain('signIn');
     });
   });
 
@@ -651,7 +651,7 @@ describe('2FA API (e2e)', () => {
     });
 
     it('фильтры myTwoFaMethods: managedBy, isEnabled, tags', async () => {
-      // состояние: transfer/signin (user, вкл), withdraw (default, вкл)
+      // состояние: transfer/signIn (user, вкл), withdraw (default, вкл)
       const globalOnly = await gql(
         `{ myTwoFaMethods(input: { managedBy: [GLOBAL] }) { method } }`,
         undefined,
@@ -674,7 +674,7 @@ describe('2FA API (e2e)', () => {
         (enabledUserTagged.data!.myTwoFaMethods as Array<{ method: string }>)
           .map((view) => view.method)
           .sort(),
-      ).toEqual(['signin', 'transfer']);
+      ).toEqual(['signIn', 'transfer']);
 
       const bySmsAllowed = await gql(
         `{ myTwoFaMethods(input: { allowedTypes: [SMS, EMAIL] }) { method } }`,

@@ -160,10 +160,10 @@ describe('OperationService.sendTwoFa', () => {
   });
 
   it('регистрационный метод (system+unauthed): код реально уходит на незнакомый identity', async () => {
-    bed.addMethod('signup', ['sms'], ['system', 'unauthed']);
+    bed.addMethod('signUp', ['sms'], ['system', 'unauthed']);
 
     const result = await service.sendTwoFa({
-      method: 'signup',
+      method: 'signUp',
       actor: { identity: '8 (912) 345-33-45', clientIp: '1.2.3.4' },
       locale: 'ru',
     });
@@ -181,11 +181,11 @@ describe('OperationService.sendTwoFa', () => {
     expect(result.types[0].identity).toBe('+8912...3345');
   });
 
-  it('signin: неизвестный identity → операция-пустышка, неотличимая снаружи', async () => {
-    bed.addMethod('signin', ['email'], ['unauthed', 'user']);
+  it('signIn: неизвестный identity → операция-пустышка, неотличимая снаружи', async () => {
+    bed.addMethod('signIn', ['email'], ['unauthed', 'user']);
 
     const result = await service.sendTwoFa({
-      method: 'signin',
+      method: 'signIn',
       actor: { identity: 'random@mail.com' },
     });
 
@@ -201,13 +201,13 @@ describe('OperationService.sendTwoFa', () => {
     expect(bed.publisher.events).toHaveLength(0);
   });
 
-  it('signin: неподтверждённый identity → тоже пустышка', async () => {
-    bed.addMethod('signin', ['email'], ['unauthed', 'user']);
+  it('signIn: неподтверждённый identity → тоже пустышка', async () => {
+    bed.addMethod('signIn', ['email'], ['unauthed', 'user']);
     const user = bed.addUser(CORE_USER);
     bed.addCredential(user, 'email', 'a@b.com', { isConfirmed: false });
 
     await service.sendTwoFa({
-      method: 'signin',
+      method: 'signIn',
       actor: { identity: 'a@b.com' },
     });
 
@@ -216,19 +216,19 @@ describe('OperationService.sendTwoFa', () => {
   });
 
   it('unauthed непокрытый метод (юзер отключил 2ФА) → пустышка вместо ошибки', async () => {
-    const signin = bed.addMethod('signin', ['email'], ['unauthed', 'user']);
+    const signIn = bed.addMethod('signIn', ['email'], ['unauthed', 'user']);
     const user = bed.addUser(CORE_USER);
     bed.addCredential(user, 'email', 'a@b.com');
-    // юзер выключил 2ФА на signin
+    // юзер выключил 2ФА на signIn
     const override = bed.crud.userMethods.seed({
       userId: user.id,
-      methodId: signin.id,
+      methodId: signIn.id,
       isActive: false,
     });
     void override;
 
     const result = await service.sendTwoFa({
-      method: 'signin',
+      method: 'signIn',
       actor: { identity: 'a@b.com' },
     });
 
@@ -290,15 +290,15 @@ describe('OperationService.sendTwoFa', () => {
     });
 
     it('пустышки учитываются в дневном лимите', async () => {
-      const signin = bed.addMethod('signin', ['email'], ['unauthed', 'user']);
-      void signin;
+      const signIn = bed.addMethod('signIn', ['email'], ['unauthed', 'user']);
+      void signIn;
       // две пустышки на этот identity уже созданы
       await service.sendTwoFa({
-        method: 'signin',
+        method: 'signIn',
         actor: { identity: 'ghost@mail.com' },
       });
       await service.sendTwoFa({
-        method: 'signin',
+        method: 'signIn',
         actor: { identity: 'ghost@mail.com' },
       });
       // fake create не проставляет createdAt — проставим для подсчёта окна
@@ -308,7 +308,7 @@ describe('OperationService.sendTwoFa', () => {
 
       await expectCode(
         service.sendTwoFa({
-          method: 'signin',
+          method: 'signIn',
           actor: { identity: 'ghost@mail.com' },
         }),
         'OPERATIONS_LIMIT-013',
@@ -316,13 +316,13 @@ describe('OperationService.sendTwoFa', () => {
     });
 
     it('часовой IP-лимит ловит ротацию identity → IP_LIMIT-014', async () => {
-      bed.addMethod('signup', ['sms'], ['system', 'unauthed']);
+      bed.addMethod('signUp', ['sms'], ['system', 'unauthed']);
       await service.sendTwoFa({
-        method: 'signup',
+        method: 'signUp',
         actor: { identity: '+79000000001', clientIp: '9.9.9.9' },
       });
       await service.sendTwoFa({
-        method: 'signup',
+        method: 'signUp',
         actor: { identity: '+79000000002', clientIp: '9.9.9.9' },
       });
       for (const row of bed.crud.operations.rows) {
@@ -331,7 +331,7 @@ describe('OperationService.sendTwoFa', () => {
 
       await expectCode(
         service.sendTwoFa({
-          method: 'signup',
+          method: 'signUp',
           actor: { identity: '+79000000003', clientIp: '9.9.9.9' },
         }),
         'IP_LIMIT-014',
@@ -487,9 +487,9 @@ describe('OperationService.sendTwoFa', () => {
     });
 
     it('переотправка пустышки отрабатывает штатно и без публикации', async () => {
-      bed.addMethod('signin', ['email'], ['unauthed', 'user']);
+      bed.addMethod('signIn', ['email'], ['unauthed', 'user']);
       const { operationId } = await service.sendTwoFa({
-        method: 'signin',
+        method: 'signIn',
         actor: { identity: 'ghost@mail.com' },
       });
       agePastRetry(operationId);
@@ -497,7 +497,7 @@ describe('OperationService.sendTwoFa', () => {
       const oldHash = row.codeHash;
 
       const result = await service.sendTwoFa({
-        method: 'signin',
+        method: 'signIn',
         actor: { identity: 'ghost@mail.com' },
         operationId,
       });
